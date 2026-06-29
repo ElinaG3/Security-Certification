@@ -1,5 +1,8 @@
-# 🔐 CompTIA Security+ Exam Prep System
-# CompTIA Security+ Exam Prep is LIVE on : https://certificationprep.netlify.app
+# 🔐 CompTIA Security+ Exam Prep
+
+## 🚀 [👉 LIVE APP - CLICK HERE! 👈](https://certificationprep.netlify.app)
+
+
 
 Complete, interactive exam prep with:
 - **📚 Learning Path**: Deep concept understanding with visuals (official exam blueprint)
