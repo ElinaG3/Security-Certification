@@ -30,7 +30,7 @@ Complete, interactive exam prep with:
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/YOUR-USERNAME/security-plus-exam-prep.git
+git clone https://github.com/ElinaG3/security-plus-exam-prep.git
 cd security-plus-exam-prep
 ```
 
