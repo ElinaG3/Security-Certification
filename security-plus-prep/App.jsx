@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import SecurityPlusPrep from './components/SecurityPlusPrep';
-import SecurityPlusLearning from './components/SecurityPlusLearning';
+import SecurityPlusPrep from './src/components/SecurityPlusPrep';
+import SecurityPlusLearning from './src/components/SecurityPlusLearning';
 
 export default function App() {
   const [currentApp, setCurrentApp] = useState('menu'); // 'menu', 'learning', 'practice'
