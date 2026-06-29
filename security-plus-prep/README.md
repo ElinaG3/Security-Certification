@@ -1,6 +1,8 @@
 # 🔐 CompTIA Security+ Exam Prep
 
-## 🚀 [👉 LIVE APP - CLICK HERE! 👈](https://certificationprep.netlify.app)
+## 🚀 Live Demo
+
+👉 **[Launch Application](https://comptiasecuritycertification.vercel.app)**
 
 
 
