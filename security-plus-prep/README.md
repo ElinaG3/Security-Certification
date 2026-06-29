@@ -1,4 +1,5 @@
 # 🔐 CompTIA Security+ Exam Prep System
+# CompTIA Security+ Exam Prep is LIVE on : https://certificationprep.netlify.app
 
 Complete, interactive exam prep with:
 - **📚 Learning Path**: Deep concept understanding with visuals (official exam blueprint)
@@ -65,7 +66,7 @@ Then open: `http://localhost:5173`
 4. Click "Deploy"
 5. Get your live URL!
 
-**Your app will be live at: `https://your-app-name.netlify.app`**
+**Your app will be live at: `https://certificationprep.netlify.app/**
 
 ### Option C: GitHub Pages
 
