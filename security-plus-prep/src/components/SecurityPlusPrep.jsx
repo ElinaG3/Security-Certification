@@ -1229,12 +1229,29 @@ const SecurityPlusApp = () => {
       explanation: 'AUP covers acceptable use of computers, internet, email, data, etc., with consequences for violations.'
     }
   ];
+  function usePersistentState(key, initialValue) {
+  const [value, setValue] = React.useState(() => {
+    try {
+      const stored = localStorage.getItem(key);
+      return stored !== null ? JSON.parse(stored) : initialValue;
+    } catch {
+      return initialValue;
+    }
+  });
+  React.useEffect(() => {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch {}
+  }, [key, value]);
+  return [value, setValue];
+}
 
   // State management
   const [mode, setMode] = useState('goalSetup'); // 'goalSetup', 'learn', 'review', 'dashboard'
   const [currentTopic, setCurrentTopic] = useState(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [performance, setPerformance] = useState({}); // {questionId: {attempts: [], lastAttempt: date}}
+  const [performance, setPerformance] = usePersistentState('sp_performance', {});
+const [goal, setGoal] = usePersistentState('sp_goal', null);
   const [sessionStats, setSessionStats] = useState({ correct: 0, total: 0 });
   const [timerActive, setTimerActive] = useState(false);
   const [sessionStartTime, setSessionStartTime] = useState(null);
