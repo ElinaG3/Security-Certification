@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 
 const SecurityPlusLearning = () => {
   // COMPREHENSIVE LEARNING CONTENT - ALL OFFICIAL COMPTIA SECURITY+ V7 OBJECTIVES
@@ -726,12 +726,28 @@ Low:      Fix within 1 year
       }
     }
   };
+  function usePersistentState(key, initialValue) {
+  const [value, setValue] = useState(() => {
+    try {
+      const stored = localStorage.getItem(key);
+      return stored !== null ? JSON.parse(stored) : initialValue;
+    } catch {
+      return initialValue;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch {}
+  }, [key, value]);
+  return [value, setValue];
+}
 
   // State management (same as before)
   const [selectedDomain, setSelectedDomain] = useState(null);
   const [selectedTopic, setSelectedTopic] = useState(null);
   const [selectedConcept, setSelectedConcept] = useState(null);
-  const [masteredConcepts, setMasteredConcepts] = useState([]);
+  const [masteredConcepts, setMasteredConcepts] = usePersistentState('sp_mastered', []);
   const [mode, setMode] = useState('domain-select');
 
   // Get unique domains
