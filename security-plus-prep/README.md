@@ -1,202 +1,68 @@
 # 🔐 CompTIA Security+ Exam Prep
 
-## 🚀 Live Demo
+**Interactive study system for the CompTIA Security+ (SY0-701) certification.** A structured learning path, 135+ practice questions, and progress tracking — everything needed to prepare in one place.
 
-👉 **[Launch Application](https://comptiasecuritycertification.vercel.app)**
+🔗 **Live app:** [comptiasecuritycertification.vercel.app](https://comptiasecuritycertification.vercel.app/)
 
-
-
-Complete, interactive exam prep with:
-- **📚 Learning Path**: Deep concept understanding with visuals (official exam blueprint)
-- **❓ Practice Questions**: 135+ exam-style questions with goal tracking (85% target)
-- **📊 Progress Tracking**: Real-time dashboard with weak spot detection
-
-## Features
-
-✅ **5 Exam Domains** with correct percentages:
-- General Security Concepts (12%)
-- Threats, Vulnerabilities, & Mitigations (22%)
-- Security Architecture (18%)
-- Security Operations (28%)
-- Security Program Management (20%)
-
-✅ **ADHD-Optimized**:
-- Chunked learning (no walls of text)
-- Visual diagrams and explanations
-- Immediate feedback
-- Progress tracking
-
-✅ **3-Week Goal System**:
-- Set custom deadline and target accuracy
-- Real-time progress tracking
-- Days remaining countdown
-- Weak spot identification
-
-## Installation
-
-### 1. Clone the Repository
-```bash
-git clone https://github.com/ElinaG3/security-plus-exam-prep.git
-cd security-plus-exam-prep
-```
-
-### 2. Install Dependencies
-```bash
-npm install
-```
-
-### 3. Run Locally
-```bash
-npm run dev
-```
-Then open: `http://localhost:5173`
-
-## Deployment Options
-
-### Option A: Vercel (EASIEST - Recommended)
-
-1. Sign up at [vercel.com](https://vercel.com)
-2. Click "New Project"
-3. Connect your GitHub repo
-4. Click "Deploy" (takes 30 seconds)
-5. Get your live URL! Share it anywhere.
-
-**Your app will be live instantly at: `https://your-app-name.vercel.app`**
-
-### Option B: Netlify
-
-1. Sign up at [netlify.com](https://netlify.com)
-2. Click "Add new site" → "Connect to Git"
-3. Select your GitHub repo
-4. Click "Deploy"
-5. Get your live URL!
-
-**Your app will be live at: `https://certificationprep.netlify.app/**
-
-### Option C: GitHub Pages
-
-1. In your repo settings, go to "Pages"
-2. Under "Build and deployment", select "GitHub Actions"
-3. Copy this workflow file to `.github/workflows/deploy.yml`:
-
-```yaml
-name: Deploy
-
-on:
-  push:
-    branches: [main]
-
-jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-      - run: npm install
-      - run: npm run build
-      - uses: actions/upload-artifact@v3
-        with:
-          name: dist
-          path: dist
-```
-
-4. Then deploy to Pages by pushing to `main`
-
-## How to Use
-
-### Learning Path
-1. Select a domain (e.g., "Security Operations")
-2. Choose a topic (e.g., "Identity & Access Management")
-3. Learn each concept with:
-   - Visual diagrams
-   - Clear explanations
-   - Real-world examples
-   - Related concepts
-4. Mark concepts as "Mastered"
-
-### Practice Questions
-1. Set a 3-week goal (deadline + target accuracy)
-2. Select topics to practice
-3. Answer questions and get immediate feedback
-4. Dashboard shows:
-   - Days remaining
-   - Questions completed
-   - Current accuracy vs target
-   - Weak topics to review
-
-### Study Strategy
-**Week 1**: Learn → Test
-- 2-3 concepts/day in Learning Path (20 min)
-- Then 4-6 practice questions (15 min)
-
-**Week 2**: Reinforce → Learn More
-- Review weak topics (10 min)
-- Test those topics (10 min)
-- Learn new topics (15 min)
-
-**Week 3**: Full Strength
-- Heavy practice (50+ questions)
-- Weak spot review
-- Target 85%+ accuracy
-
-## Technologies
-
-- React 18
-- Vite (fast build tool)
-- Recharts (progress visualizations)
-- Pure CSS (no external styling libraries)
-
-## File Structure
-
-```
-├── index.html          # HTML entry point
-├── package.json        # Dependencies & scripts
-├── vite.config.js      # Vite configuration
-├── .gitignore          # Git ignore rules
-├── main.jsx            # React entry point
-├── src/
-│   ├── App.jsx         # Main app (menu + routing)
-│   └── components/
-│       ├── SecurityPlusLearning.jsx  # Learning path
-│       └── SecurityPlusPrep.jsx      # Practice questions
-└── public/
-    └── (assets if needed)
-```
-
-## Exam Info
-
-- **Exam**: CompTIA Security+ (SY0-701 v7)
-- **Questions**: 90 questions
-- **Time**: 90 minutes
-- **Passing Score**: 750/900 (~83%)
-- **Cost**: ~$370 USD
-- **Renewal**: Every 3 years
-
-## Tips for Success
-
-✅ Use Learning Path FIRST to understand concepts
-✅ Set a realistic 3-week goal with deadline
-✅ Do 4-6 practice questions daily
-✅ Review weak topics immediately
-✅ Aim for 85%+ accuracy before exam
-✅ Take full 50-question practice tests in final week
-
-## Contributing
-
-Found a bug or want to add content? Open an issue or submit a PR!
-
-## License
-
-MIT - Use freely for personal study
-
-## Support
-
-Questions? Contact: [Your email or GitHub issues]
+![Learning path view](docs/screenshots/learning-path.png)
 
 ---
 
-**Good luck on your Security+ exam! 🚀**
+## ✨ What it does
 
-Remember: Understanding concepts (Learning) + Testing knowledge (Practice) = Success
+Preparing for a certification exam usually means juggling scattered notes, question dumps, and no sense of progress. This app puts the whole preparation flow in one interface:
+
+1. **Follow a structured learning path** — topics organized to build on each other, mirroring the official exam domains
+2. **Practice with 135+ questions** — instant feedback with explanations, not just right/wrong
+3. **Track your progress** — see which domains are solid and which need another pass before exam day
+
+## 🎯 Why I built it
+
+Studying for Security+ myself, I wanted a tool that treats exam prep as a *learning journey* with visible progress — not a random question grinder. Building it doubled as both study method and portfolio project: explaining a concept well enough to write a question about it is the best way to learn it.
+
+## 🛠️ Tech stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | React 18, Vite, Tailwind CSS |
+| State & progress | Client-side state management |
+| Deployment | Vercel |
+
+## 🧠 Design highlights
+
+- **Learning path over question dump:** content is sequenced by exam domain, so the app guides *what to study next* instead of leaving the user to decide.
+- **Feedback that teaches:** every practice question explains the reasoning behind the correct answer — the difference between memorizing and understanding.
+- **Progress as motivation:** visible completion tracking turns an intimidating certification into a series of small wins.
+- **Zero-friction access:** no login, no setup — open the link and start studying immediately.
+
+## 📸 Screenshots
+
+| Learning path | Practice questions | Progress tracking |
+|---|---|---|
+| ![Path](docs/screenshots/learning-path.png) | ![Questions](docs/screenshots/questions.png) | ![Progress](docs/screenshots/progress.png) |
+
+## 🚀 Run locally
+
+```bash
+git clone https://github.com/ElinaG3/YOUR-REPO-NAME.git
+cd YOUR-REPO-NAME
+npm install
+npm run dev
+```
+
+## 🗺️ Roadmap
+
+- [ ] Expanded question bank (200+ questions)
+- [ ] Exam simulation mode (timed, scored like the real test)
+- [ ] Spaced-repetition review of missed questions
+- [ ] Multilingual support (EN / DE)
+
+## 📄 License
+
+MIT
+
+---
+
+*Built by [Elina](https://github.com/ElinaG3) — part of a portfolio focused on tools that teach complex material through structured, interactive practice.*
+
+
