@@ -64,7 +64,3 @@ MIT
 ---
 
 *Built by [Elina](https://github.com/ElinaG3) — part of a portfolio focused on tools that teach complex material through structured, interactive practice.*
-<<<<<<< Updated upstream
----
-=======
->>>>>>> Stashed changes
