@@ -1257,7 +1257,7 @@ const [goal, setGoal] = usePersistentState('sp_goal', null);
   const [sessionStartTime, setSessionStartTime] = useState(null);
   
   // Goal state
-  const [goal, setGoal] = useState(null); // {targetDate, targetAccuracy, questionsTarget, createdAt}
+  
   const [goalWeeks, setGoalWeeks] = useState('3');
   const [goalAccuracy, setGoalAccuracy] = useState('85');
   const [goalQuestions, setGoalQuestions] = useState(String(questionBank.length));
