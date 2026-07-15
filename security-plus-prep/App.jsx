@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import SecurityPlusPrep from './src/components/SecurityPlusPrep';
 import SecurityPlusLearning from './src/components/SecurityPlusLearning';
-import { Analytics } from '@vercel/analytics/react';
+
 
 export default function App() {
   const [currentApp, setCurrentApp] = useState('menu'); // 'menu', 'learning', 'practice'
