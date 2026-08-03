@@ -32,6 +32,12 @@ export const cards = pgTable('cards', {
   sourceType: text('source_type'), // 'manual' | 'pdf' | 'image' | 'note'
   sourceRef: text('source_ref'), // e.g. file id + page, or note id
 
+  // Authoring metadata, populated for generated content only — null for the
+  // legacy 135 seed cards. Distinct from `difficulty` above, which is
+  // FSRS's algorithm-computed value, not an authored label.
+  authoredDifficulty: text('authored_difficulty'), // 'recall' | 'application' | 'analysis'
+  objective: text('objective'), // SY0-701 exam objective number, e.g. '2.4'
+
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 

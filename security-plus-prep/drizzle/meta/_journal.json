@@ -15,6 +15,13 @@
       "when": 1785779478571,
       "tag": "0001_perpetual_terror",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785791991686,
+      "tag": "0002_blushing_gravity",
+      "breakpoints": true
     }
   ]
 }
