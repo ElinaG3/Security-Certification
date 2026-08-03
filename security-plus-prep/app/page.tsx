@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { getDb } from '@/db';
 import { cards } from '@/db/schema';
 import { getCurrentUser } from '@/lib/auth';
@@ -37,6 +38,9 @@ export default async function Home() {
               </li>
             ))}
           </ul>
+          <p style={{ marginTop: 24 }}>
+            <Link href="/study">Start studying &rarr;</Link>
+          </p>
         </>
       )}
     </main>
