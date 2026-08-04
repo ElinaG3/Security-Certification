@@ -126,7 +126,8 @@ const submitCardsTool: Anthropic.Tool = {
             distractorExplanations: {
               type: 'array',
               items: { type: 'string' },
-              description: 'One entry per option, same order. Empty string for correct option(s).',
+              description:
+                'MUST have exactly options.length entries, in the same order as options. Empty string "" at every correct index, non-empty option-specific text everywhere else. Never omit the correct index — its slot must still exist as "".',
             },
           },
           required: ['domain', 'type', 'topic', 'objective', 'authoredDifficulty', 'question', 'options', 'correct', 'explanation', 'distractorExplanations'],
@@ -158,7 +159,13 @@ DISTRACTORS — this is the highest-value part, do not skimp on it:
 - Every wrong option must be a REAL, valid security control or concept that would be correct in a DIFFERENT scenario — never an obviously-wrong or nonsensical option. Wrong here means "wrong in THIS context," not "wrong in general."
 - distractorExplanations must say specifically why that real control doesn't fit this scenario — not a generic restatement of the correct answer.
 
-multiple_select questions: the question text MUST end with "(Choose ${'{requiredCount}'}.)" matching the spec's requiredCount exactly (e.g. "(Choose two.)" or "(Choose three.)"). correct must be an array with exactly requiredCount indices.
+distractorExplanations ARRAY ALIGNMENT — this has been a source of bugs, follow it exactly:
+- distractorExplanations must have EXACTLY the same length as options, one entry per option, in the SAME ORDER as options — do not build it by skipping the correct option and only listing the wrong ones.
+- The entry at each correct index (single index for multiple_choice, every index in correct[] for multiple_select) must be the empty string "".
+- Every other index must have a non-empty, option-specific explanation.
+- Before finalizing each card, verify: len(distractorExplanations) === len(options), and distractorExplanations[i] === "" if and only if i is a correct index.
+
+multiple_select questions: the question text MUST end with "(Choose ${'{requiredCount}'}.)" matching the spec's requiredCount exactly (e.g. "(Choose two.)" or "(Choose three.)") — never omit this phrase. correct must be an array with exactly requiredCount indices.
 
 objective: assign the real SY0-701 exam objective number (e.g. "1.2", "3.4", "4.7") that this question maps to within its domain — use your knowledge of the official SY0-701 objectives list.
 
