@@ -6,6 +6,7 @@ import {
   integer,
   real,
   jsonb,
+  boolean,
 } from 'drizzle-orm/pg-core';
 
 export const users = pgTable('users', {
@@ -37,6 +38,13 @@ export const cards = pgTable('cards', {
   // FSRS's algorithm-computed value, not an authored label.
   authoredDifficulty: text('authored_difficulty'), // 'recall' | 'application' | 'analysis'
   objective: text('objective'), // SY0-701 exam objective number, e.g. '2.4'
+
+  // Paired-associate memory aid (e.g. "443/636/993/995 = 80/389/143/110 +
+  // TLS") for arbitrary-recall content like ports or acronyms. Only
+  // authoredDifficulty: 'recall' cards get one — scenario-style
+  // application/analysis cards don't need this kind of aid. Shown to the
+  // user only after they reveal a card's answer.
+  mnemonic: text('mnemonic'),
 
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -78,6 +86,27 @@ export const reviewLog = pgTable('review_log', {
   // src/lib/fsrs.ts, and lets the thresholds be re-tuned later without
   // losing history.
   responseMs: integer('response_ms').notNull(),
+
+  // Whether the user bypassed the post-submit elaboration gate (see
+  // src/components/StudySession.tsx) via the skip shortcut instead of
+  // waiting out the pause before revealing the answer. Defaults to false
+  // for rows logged before this feature existed.
+  elaborationSkipped: boolean('elaboration_skipped').notNull().default(false),
+
+  // Whether this rep actually advanced FSRS scheduling (true) or was a
+  // practice/warm-up rep on a card that wasn't due yet, logged for
+  // visibility but excluded from the scheduler (false). Determined
+  // server-side from the card's own due date at submit time — see
+  // app/study/actions.ts. Defaults to true: every row logged before this
+  // feature existed was a real scheduled rep.
+  scheduled: boolean('scheduled').notNull().default(true),
+
+  // Per-option/per-sub-question grading breakdown for PBQ types
+  // (log_analysis, config_table, remediation_select) — null for
+  // multiple_choice/multiple_select, which are fully described by
+  // `rating` + the card's own content. Shape varies by question type; see
+  // src/lib/pbq-grading.ts.
+  subResults: jsonb('sub_results'),
 
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });

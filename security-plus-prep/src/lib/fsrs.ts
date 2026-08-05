@@ -76,26 +76,60 @@ function deriveRating(correct: boolean, responseMs: number, medianMs: number | n
   return Rating.Good;
 }
 
-export async function scheduleReview({
-  db,
+// PBQ rating is score-based rather than boolean-correct: partial credit
+// (remediation_select's continuous score, or an artifact PBQ's fraction of
+// correct sub-questions) maps to Hard rather than collapsing to Again or
+// Good. No slow-response Hard case here (unlike deriveRating) — only a
+// fast-response Easy bonus, same threshold.
+function derivePbqRating(score: number, responseMs: number, medianMs: number | null): Grade {
+  if (score < 0.5) return Rating.Again;
+  if (score < 1.0) return Rating.Hard;
+  if (medianMs !== null && responseMs < medianMs * EASY_THRESHOLD) return Rating.Easy;
+  return Rating.Good;
+}
+
+async function computeRatingForChoice(
+  db: ReturnType<typeof getDb>,
+  userId: string,
+  questionType: QuestionType,
+  correct: boolean,
+  responseMs: number
+): Promise<Grade> {
+  const medianMs = await getRollingMedianMs(db, userId, questionType);
+  return deriveRating(correct, responseMs, medianMs);
+}
+
+// medianMs is looked up per questionType (never pooled across PBQ types,
+// or with multiple_choice/multiple_select) via the existing
+// getRollingMedianMs, which already filters by cards.type.
+async function computeRatingForPbq(
+  db: ReturnType<typeof getDb>,
+  userId: string,
+  questionType: QuestionType,
+  score: number,
+  responseMs: number
+): Promise<Grade> {
+  const medianMs = await getRollingMedianMs(db, userId, questionType);
+  return derivePbqRating(score, responseMs, medianMs);
+}
+
+function applySchedule({
   cardRow,
   userId,
-  questionType,
-  correct,
+  rating,
   responseMs,
-  now = new Date(),
+  elaborationSkipped,
+  subResults,
+  now,
 }: {
-  db: ReturnType<typeof getDb>;
   cardRow: CardRow;
   userId: string;
-  questionType: QuestionType;
-  correct: boolean;
+  rating: Grade;
   responseMs: number;
-  now?: Date;
+  elaborationSkipped: boolean;
+  subResults: unknown;
+  now: Date;
 }) {
-  const medianMs = await getRollingMedianMs(db, userId, questionType);
-  const rating = deriveRating(correct, responseMs, medianMs);
-
   const card = rowToCard(cardRow);
   const { card: nextCard, log } = scheduler.next(card, now, rating);
 
@@ -113,14 +147,121 @@ export async function scheduleReview({
     updatedAt: now,
   };
 
-  const logInsert = reviewLogRowFromLog(log, { cardId: cardRow.id, userId, responseMs });
+  const logInsert = reviewLogRowFromLog(log, {
+    cardId: cardRow.id,
+    userId,
+    responseMs,
+    elaborationSkipped,
+    subResults,
+  });
 
   return { rating, cardUpdate, logInsert };
 }
 
+export async function scheduleReview({
+  db,
+  cardRow,
+  userId,
+  questionType,
+  correct,
+  responseMs,
+  elaborationSkipped,
+  now = new Date(),
+}: {
+  db: ReturnType<typeof getDb>;
+  cardRow: CardRow;
+  userId: string;
+  questionType: QuestionType;
+  correct: boolean;
+  responseMs: number;
+  elaborationSkipped: boolean;
+  now?: Date;
+}) {
+  const rating = await computeRatingForChoice(db, userId, questionType, correct, responseMs);
+  return applySchedule({ cardRow, userId, rating, responseMs, elaborationSkipped, subResults: null, now });
+}
+
+export async function schedulePbqReview({
+  db,
+  cardRow,
+  userId,
+  questionType,
+  score,
+  responseMs,
+  elaborationSkipped,
+  subResults,
+  now = new Date(),
+}: {
+  db: ReturnType<typeof getDb>;
+  cardRow: CardRow;
+  userId: string;
+  questionType: QuestionType;
+  score: number;
+  responseMs: number;
+  elaborationSkipped: boolean;
+  subResults: unknown;
+  now?: Date;
+}) {
+  const rating = await computeRatingForPbq(db, userId, questionType, score, responseMs);
+  return applySchedule({ cardRow, userId, rating, responseMs, elaborationSkipped, subResults, now });
+}
+
+// The "card isn't actually due" safety net: no scheduler.next() call, no
+// `cards` row mutation. Snapshots the card's CURRENT (unchanged) FSRS state
+// into the log row rather than an evolved one, since nothing about the
+// card's schedule actually changed. `rating` is still computed by the
+// caller (via deriveRating/derivePbqRating) purely for the log record —
+// it never reaches the scheduler.
+export function logUnscheduledReview({
+  cardRow,
+  userId,
+  rating,
+  responseMs,
+  elaborationSkipped,
+  subResults,
+  now = new Date(),
+}: {
+  cardRow: CardRow;
+  userId: string;
+  rating: Grade;
+  responseMs: number;
+  elaborationSkipped: boolean;
+  subResults: unknown;
+  now?: Date;
+}) {
+  const logInsert = {
+    cardId: cardRow.id,
+    userId,
+    rating,
+    state: cardRow.state,
+    due: cardRow.due,
+    stability: cardRow.stability,
+    difficulty: cardRow.difficulty,
+    elapsedDays: cardRow.elapsedDays,
+    lastElapsedDays: cardRow.elapsedDays,
+    scheduledDays: cardRow.scheduledDays,
+    learningSteps: cardRow.learningSteps,
+    review: now,
+    responseMs,
+    elaborationSkipped,
+    scheduled: false,
+    subResults,
+  };
+
+  return { logInsert };
+}
+
+export { computeRatingForChoice, computeRatingForPbq };
+
 function reviewLogRowFromLog(
   log: ReviewLog,
-  extra: { cardId: string; userId: string; responseMs: number }
+  extra: {
+    cardId: string;
+    userId: string;
+    responseMs: number;
+    elaborationSkipped: boolean;
+    subResults: unknown;
+  }
 ) {
   return {
     cardId: extra.cardId,
@@ -136,6 +277,9 @@ function reviewLogRowFromLog(
     learningSteps: log.learning_steps,
     review: log.review,
     responseMs: extra.responseMs,
+    elaborationSkipped: extra.elaborationSkipped,
+    scheduled: true,
+    subResults: extra.subResults,
   };
 }
 

@@ -95,6 +95,7 @@ const GeneratedCardSchema = z.object({
   requiredCount: z.number().optional(),
   explanation: z.string(),
   distractorExplanations: z.array(z.string()),
+  mnemonic: z.string().optional(),
 });
 const BatchResultSchema = z.object({ cards: z.array(GeneratedCardSchema) });
 type GeneratedCard = z.infer<typeof GeneratedCardSchema>;
@@ -128,6 +129,11 @@ const submitCardsTool: Anthropic.Tool = {
               items: { type: 'string' },
               description:
                 'MUST have exactly options.length entries, in the same order as options. Empty string "" at every correct index, non-empty option-specific text everywhere else. Never omit the correct index — its slot must still exist as "".',
+            },
+            mnemonic: {
+              type: 'string',
+              description:
+                'ONLY for authoredDifficulty "recall" AND arbitrary paired-associate content (ports, acronyms, protocol numbers, other facts with no inherent logical connection). Omit entirely for application/analysis cards and for recall cards that are not this kind of arbitrary pairing.',
             },
           },
           required: ['domain', 'type', 'topic', 'objective', 'authoredDifficulty', 'question', 'options', 'correct', 'explanation', 'distractorExplanations'],
@@ -171,6 +177,16 @@ objective: assign the real SY0-701 exam objective number (e.g. "1.2", "3.4", "4.
 
 topic: a short 2-5 word label for this specific question's subtopic.
 
+MNEMONIC — only for "recall" difficulty, and only when the fact being tested is
+arbitrary paired-associate content with no inherent logical connection (port
+numbers, protocol numbers, acronym expansions, and the like). Prefer a
+pattern-based mnemonic that relates the fact to something the learner already
+knows over an arbitrary rhyme — e.g. for TLS-wrapped port numbers: "443, 636,
+993, 995 are 80, 389, 143, 110 with TLS added." If a recall card doesn't fit
+this pattern-based mold, a short standard mnemonic (acronym, image, rhyme) is
+fine — but omit the mnemonic field entirely for application/analysis cards,
+and for recall cards where no natural pairing exists.
+
 Specs:
 ${spec}
 
@@ -212,6 +228,7 @@ function printCard(card: GeneratedCard) {
     }
   });
   console.log(`Explanation: ${card.explanation}`);
+  if (card.mnemonic) console.log(`Mnemonic: ${card.mnemonic}`);
 }
 
 async function main() {
@@ -264,6 +281,9 @@ async function main() {
         sourceType: 'generated',
         authoredDifficulty: card.authoredDifficulty,
         objective: card.objective,
+        // Only recall cards ever get a mnemonic — enforced here even if the
+        // model ignores the prompt's difficulty gate.
+        mnemonic: card.authoredDifficulty === 'recall' ? card.mnemonic ?? null : null,
       });
       total++;
     }
