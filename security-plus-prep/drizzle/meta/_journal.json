@@ -1,0 +1,41 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1785771139924,
+      "tag": "0000_mute_ricochet",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1785779478571,
+      "tag": "0001_perpetual_terror",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785791991686,
+      "tag": "0002_blushing_gravity",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785942265284,
+      "tag": "0003_add_mnemonic_and_elaboration_gate",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785964223832,
+      "tag": "0004_add_pbq_review_log_columns",
+      "breakpoints": true
+    }
+  ]
+}
