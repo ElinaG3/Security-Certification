@@ -5,7 +5,7 @@
 // generated content will be held to, so day-one content already passes
 // what Phase 4 will enforce.
 //
-// Usage: npx dotenv-cli -e .env.local -e .env -- tsx scripts/seed-pbq-cards.ts
+// Usage: npx dotenv-cli -e .env -- tsx scripts/seed-pbq-cards.ts
 
 import { eq, and } from 'drizzle-orm';
 import { getDb } from '../src/db';

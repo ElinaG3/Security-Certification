@@ -5,8 +5,9 @@
 // option, like the bug found in the 8-card sample) — that needs a human
 // read, which is what the random-sample step below is for.
 //
-// Usage: npx dotenv-cli -e .env.local -e .env -- tsx scripts/check-card-consistency.ts
+// Usage: npx dotenv-cli -e .env -- tsx scripts/check-card-consistency.ts
 
+import { writeFileSync } from 'node:fs';
 import { eq } from 'drizzle-orm';
 import { getDb } from '../src/db';
 import { cards } from '../src/db/schema';
@@ -230,19 +231,34 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-function printCardFull(card: { domain: string; topic: string; objective: string | null; authoredDifficulty: string | null; type: string; content: unknown }) {
+function formatCardFull(card: { domain: string; topic: string; objective: string | null; authoredDifficulty: string | null; type: string; content: unknown }): string {
   const content = card.content as Content;
   const correctIndices = Array.isArray(content.correct) ? content.correct : [content.correct];
-  console.log(`\n--- [${card.domain}] ${card.topic}${card.objective ? ` (obj ${card.objective})` : ''}${card.authoredDifficulty ? `, ${card.authoredDifficulty}` : ''}, ${card.type}`);
-  console.log(`Q: ${content.question}`);
+  const lines: string[] = [];
+  lines.push(`\n--- [${card.domain}] ${card.topic}${card.objective ? ` (obj ${card.objective})` : ''}${card.authoredDifficulty ? `, ${card.authoredDifficulty}` : ''}, ${card.type}`);
+  lines.push(`Q: ${content.question}`);
   content.options.forEach((opt, idx) => {
     const marker = correctIndices.includes(idx) ? '(correct)' : '(wrong)';
-    console.log(`  ${idx} ${marker}: ${opt}`);
+    lines.push(`  ${idx} ${marker}: ${opt}`);
     if (!correctIndices.includes(idx)) {
-      console.log(`     -> ${content.distractorExplanations?.[idx] ?? '(missing)'}`);
+      lines.push(`     -> ${content.distractorExplanations?.[idx] ?? '(missing)'}`);
     }
   });
-  console.log(`Explanation: ${content.explanation}`);
+  lines.push(`Explanation: ${content.explanation}`);
+  return lines.join('\n');
+}
+
+// Writes a random-sample dump of MC/MS cards to a file for manual semantic
+// review (the structural check can't catch an explanation that doesn't
+// actually match its option — that needs a human read). Shared by section B
+// (new pending cards -> samples-new.txt) and section C (legacy/seeded
+// active cards -> samples-legacy.txt).
+function writeSampleFile(path: string, header: string, sampleCards: (typeof cards.$inferSelect)[]): number {
+  const mcMsCards = sampleCards.filter((c) => c.type === 'multiple_choice' || c.type === 'multiple_select');
+  const sample = shuffle(mcMsCards).slice(0, 20);
+  const text = [header, ...sample.map(formatCardFull)].join('\n');
+  writeFileSync(path, text + '\n');
+  return sample.length;
 }
 
 async function main() {
@@ -277,12 +293,15 @@ async function main() {
   }
   console.log(`\nPassing structural check: ${passing.length} / ${pending.length}`);
 
-  console.log('\n=== B. 20 random passing cards — read these for semantic issues ===');
-  // printCardFull only knows the MC/MS shape — fine today since pending
+  // formatCardFull only knows the MC/MS shape — fine today since pending
   // cards are only ever generate-cards.ts output (MC/MS); Phase 4's PBQ
-  // generation will need its own printer here.
-  const sample = shuffle(passing.filter((c) => c.type === 'multiple_choice' || c.type === 'multiple_select')).slice(0, 20);
-  for (const card of sample) printCardFull(card);
+  // generation will need its own formatter here.
+  const newCount = writeSampleFile(
+    'samples-new.txt',
+    '=== B. 20 random passing cards — read these for semantic issues ===',
+    passing
+  );
+  console.log(`\nWrote ${newCount} sample(s) to samples-new.txt for semantic review.`);
 
   console.log('\n=== C. Legacy + seeded cards — retroactive check (report only, no status change) ===');
   const legacy = await db.select().from(cards).where(eq(cards.status, 'active'));
@@ -296,6 +315,13 @@ async function main() {
     console.log(`  [${f.label}]`);
     for (const issue of f.issues) console.log(`    - ${issue}`);
   }
+
+  const legacyCount = writeSampleFile(
+    'samples-legacy.txt',
+    '=== C2. 20 random legacy/seeded cards — read these for semantic issues ===',
+    legacy
+  );
+  console.log(`\nWrote ${legacyCount} sample(s) to samples-legacy.txt for semantic review.`);
 }
 
 // Only run the CLI when this file is executed directly — importing

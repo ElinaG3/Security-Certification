@@ -1,5 +1,5 @@
 // Ground-truth audit of the DB + codebase. Re-run any time with:
-//   npx dotenv-cli -e .env.local -e .env -- tsx scripts/audit-cards.ts
+//   npx dotenv-cli -e .env -- tsx scripts/audit-cards.ts
 // Queries and greps only — never trust a prior session's summary of what
 // shipped over what's actually in the database and the code.
 

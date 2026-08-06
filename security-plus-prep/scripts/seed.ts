@@ -10,7 +10,7 @@ const db = drizzle(client, { schema });
 
 async function main() {
   const email = process.env.SEED_USER_EMAIL;
-  if (!email) throw new Error('Set SEED_USER_EMAIL in .env.local before seeding.');
+  if (!email) throw new Error('Set SEED_USER_EMAIL in .env before seeding.');
 
   let [user] = await db.select().from(schema.users).where(eq(schema.users.email, email));
   if (!user) {

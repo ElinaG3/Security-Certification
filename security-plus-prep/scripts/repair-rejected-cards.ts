@@ -10,7 +10,7 @@
 // now passes. Cards that still fail after repair stay 'rejected' and are
 // reported.
 //
-// Usage: npx dotenv-cli -e .env.local -e .env -- tsx scripts/repair-rejected-cards.ts
+// Usage: npx dotenv-cli -e .env -- tsx scripts/repair-rejected-cards.ts
 
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
