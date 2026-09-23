@@ -19,8 +19,9 @@ import { getDb } from '../src/db';
 import { cards } from '../src/db/schema';
 import type { MultipleChoiceContent, MultipleSelectContent } from '../src/db/question-types';
 import { checkCardConsistency } from './check-card-consistency';
+import { AI_MODELS } from '../src/lib/ai-models';
 
-const MODEL = 'claude-sonnet-5';
+const MODEL = AI_MODELS.content;
 const BATCH_SIZE = 6;
 const client = new Anthropic();
 

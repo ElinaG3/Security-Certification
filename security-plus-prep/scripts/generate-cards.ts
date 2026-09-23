@@ -3,8 +3,9 @@ import { z } from 'zod';
 import { getDb } from '../src/db';
 import { cards } from '../src/db/schema';
 import { getCurrentUser } from '../src/lib/auth';
+import { AI_MODELS } from '../src/lib/ai-models';
 
-const MODEL = 'claude-sonnet-5';
+const MODEL = AI_MODELS.content;
 const BATCH_SIZE = 6;
 
 const client = new Anthropic();

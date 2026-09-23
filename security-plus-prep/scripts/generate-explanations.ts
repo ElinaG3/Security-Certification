@@ -5,8 +5,9 @@ import { getDb } from '../src/db';
 import { cards, explanationSuggestions } from '../src/db/schema';
 import { getCurrentUser } from '../src/lib/auth';
 import type { MultipleChoiceContent } from '../src/db/question-types';
+import { AI_MODELS } from '../src/lib/ai-models';
 
-const MODEL = 'claude-sonnet-5';
+const MODEL = AI_MODELS.content;
 const BATCH_SIZE = 15;
 
 const client = new Anthropic();
