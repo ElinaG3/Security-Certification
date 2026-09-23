@@ -3,6 +3,7 @@ import { getDb } from '@/db';
 import { cards } from '@/db/schema';
 
 export const DEFAULT_SESSION_SIZE = 15;
+export const MIN_MULTI_SELECT_PER_SESSION = 4;
 
 const PBQ_TYPES = ['log_analysis', 'config_table', 'remediation_select'] as const;
 
@@ -58,7 +59,42 @@ export async function getDueQueue({
     round++;
   }
 
-  return interleaved;
+  return ensureMinMultiSelect(interleaved, due, limit);
+}
+
+// Domain-interleaving alone can leave a session with zero or one
+// multiple_select card just because none happened to be due early in a
+// domain's bucket — the composition guarantee (>= MIN_MULTI_SELECT per
+// session) must not be left to that draw. If the interleaved queue is
+// short on multiple_select cards, top it up from the full due pool by
+// swapping into the least-urgent (tail-most) non-multiple_select slots,
+// which minimizes disruption to the domain-interleaved ordering. This can
+// only guarantee as many as are actually due — if fewer than
+// MIN_MULTI_SELECT multiple_select cards are due system-wide, it tops up
+// as many as it can and leaves the rest of the queue untouched.
+function ensureMinMultiSelect(queue: CardRow[], due: CardRow[], limit: number): CardRow[] {
+  const currentMsCount = queue.filter((c) => c.type === 'multiple_select').length;
+  if (currentMsCount >= MIN_MULTI_SELECT_PER_SESSION) return queue;
+
+  const queueIds = new Set(queue.map((c) => c.id));
+  const extraMs = due
+    .filter((c) => c.type === 'multiple_select' && !queueIds.has(c.id))
+    .slice(0, MIN_MULTI_SELECT_PER_SESSION - currentMsCount);
+  if (extraMs.length === 0) return queue;
+
+  const result = [...queue];
+  const swapIndices = result
+    .map((c, i) => i)
+    .filter((i) => result[i].type !== 'multiple_select')
+    .reverse();
+
+  for (const extra of extraMs) {
+    const idx = swapIndices.shift();
+    if (idx === undefined) break; // no more non-multiple_select slots to swap out
+    result[idx] = extra;
+  }
+
+  return result.slice(0, limit);
 }
 
 // Practice queue for PBQ types, regardless of due date — there are only a
