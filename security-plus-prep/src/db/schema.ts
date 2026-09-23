@@ -24,6 +24,11 @@ export const cards = pgTable('cards', {
   domain: text('domain').notNull(),
   topic: text('topic').notNull(),
 
+  // Which exam objectives version this card was authored/weighted against.
+  // Lets SY0-801 (V8, expected ~Nov 2026) content coexist with SY0-701
+  // without reworking the schema when that migration happens.
+  examVersion: text('exam_version').notNull().default('SY0-701'),
+
   type: text('type').notNull(),
   content: jsonb('content').notNull(),
 
