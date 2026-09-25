@@ -321,6 +321,8 @@ EVERY QUESTION:
 - End every question with its assigned qualifier, worded naturally. For multiple_select, phrase around selecting multiple (e.g. "Which TWO of the following...") while still ending on the assigned qualifier where it fits naturally.
 - All 4 options must be real, plausible, legitimate security controls or concepts drawn from the same subject area as the source material — never a throwaway or nonsensical distractor. For multiple_choice: at least TWO of the four must be genuinely defensible; only ONE is BEST. For multiple_select: exactly requiredCount are correct, the rest plausible-but-inferior.
 
+multiple_select DISTRACTOR QUALITY — this is exactly where generated "Choose two/three" questions tend to go weak: every wrong option must be a legitimate, real-world control a competent practitioner might genuinely reach for — plausible in general, wrong ONLY because of a specific detail in THIS scenario (wrong layer, wrong phase, wrong scope, wrong cost tier, solves a different risk). If a wrong option could be eliminated just by recognizing it's not a real or sensible control — without needing to read the scenario at all — rewrite it. A test-taker should need to understand the scenario to eliminate every wrong option, never just skim the option list and spot the silly ones.
+
 DISTRACTOR EXPLANATIONS — the highest-value part, do not skimp:
 - EVERY wrong option, no exceptions, gets a real, specific, non-empty explanation written out in full, saying SPECIFICALLY why it is worse in THIS scenario.
 - The top-level 'explanation' field must be genuine prose explaining why the correct answer(s) are BEST.

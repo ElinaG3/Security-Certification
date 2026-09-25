@@ -166,6 +166,8 @@ DISTRACTORS — this is the highest-value part, do not skimp on it:
 - Every wrong option must be a REAL, valid security control or concept that would be correct in a DIFFERENT scenario — never an obviously-wrong or nonsensical option. Wrong here means "wrong in THIS context," not "wrong in general."
 - distractorExplanations must say specifically why that real control doesn't fit this scenario — not a generic restatement of the correct answer.
 
+multiple_select DISTRACTOR QUALITY — this is exactly where generated "Choose two/three" questions tend to go weak: every wrong option must be a legitimate, real-world control a competent practitioner might genuinely reach for — plausible in general, wrong ONLY because of a specific detail in THIS scenario (wrong layer, wrong phase, wrong scope, wrong cost tier, solves a different risk). If a wrong option could be eliminated just by recognizing it's not a real or sensible control — without needing to read the scenario at all — rewrite it. A test-taker should need to understand the scenario to eliminate every wrong option, never just skim the option list and spot the silly ones.
+
 distractorExplanations ARRAY ALIGNMENT — this has been a source of bugs, follow it exactly:
 - distractorExplanations must have EXACTLY the same length as options, one entry per option, in the SAME ORDER as options — do not build it by skipping the correct option and only listing the wrong ones.
 - The entry at each correct index (single index for multiple_choice, every index in correct[] for multiple_select) must be the empty string "".
