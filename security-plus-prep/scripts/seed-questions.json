@@ -57,7 +57,7 @@
   },
   {
     "id": 5,
-    "domain": "General Security Concepts",
+    "domain": "Security Operations",
     "topic": "Authentication Methods",
     "question": "What is the primary advantage of OAuth 2.0?",
     "options": [
