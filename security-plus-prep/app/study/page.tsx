@@ -75,6 +75,7 @@ export default async function StudyPage({
         <Link href="/study?mode=warmup" style={{ fontWeight: isWarmup ? 700 : 400 }}>
           PBQ warm-up
         </Link>
+        <Link href="/create">+ Create card</Link>
       </nav>
 
       {publicCards.length === 0 ? (

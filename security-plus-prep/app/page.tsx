@@ -41,6 +41,9 @@ export default async function Home() {
           <p style={{ marginTop: 24 }}>
             <Link href="/study">Start studying &rarr;</Link>
           </p>
+          <p style={{ marginTop: 8 }}>
+            <Link href="/create">Create a card &rarr;</Link>
+          </p>
         </>
       )}
     </main>
