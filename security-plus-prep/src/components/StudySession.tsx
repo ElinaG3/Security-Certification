@@ -162,7 +162,6 @@ export function StudySession({ initialCards }: { initialCards: PublicCard[] }) {
 
   useEffect(() => {
     if (phase !== 'gated') return;
-    setCanReveal(false);
     const timer = setTimeout(() => setCanReveal(true), GATE_MS);
     return () => clearTimeout(timer);
   }, [phase, index]);
@@ -213,6 +212,7 @@ export function StudySession({ initialCards }: { initialCards: PublicCard[] }) {
     revealingRef.current = false;
     setPendingResponseMs(responseMs);
     setGateStartedAt(Date.now());
+    setCanReveal(false);
     setPhase('gated');
   }
 

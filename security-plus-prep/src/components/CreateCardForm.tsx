@@ -303,7 +303,7 @@ export function CreateCardForm() {
 
           {saveIssues && (
             <div style={{ background: '#fdf4f4', border: '1px solid #f0c4c4', borderRadius: 6, padding: 12, marginBottom: 16 }}>
-              <p style={{ fontWeight: 600, color: '#c0392b', marginBottom: 6 }}>Can't save — fix these first:</p>
+              <p style={{ fontWeight: 600, color: '#c0392b', marginBottom: 6 }}>Can&apos;t save — fix these first:</p>
               <ul style={{ margin: 0, paddingLeft: 20, color: '#c0392b' }}>
                 {saveIssues.map((issue, i) => (
                   <li key={i}>{issue}</li>
