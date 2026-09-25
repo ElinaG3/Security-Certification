@@ -1,6 +1,4 @@
-// Single source of truth for which Claude model each AI call path uses.
-// Change a model here, not per-script — every generation/grading script
-// imports from this file instead of hardcoding a model string.
+// Single source of truth for which Claude model each AI call path uses — import from here, never hardcode a model string.
 export const AI_MODELS = {
   // One-time/occasional batch content generation (card writing, rewrites,
   // explanation/mnemonic drafting, repair). Output quality directly affects
