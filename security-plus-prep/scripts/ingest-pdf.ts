@@ -167,7 +167,12 @@ async function loadOrCreateChunks(sourceFile: string, rawChunks: RawChunk[]) {
 
 async function scoreNovelty(chunkRows: (typeof ingestedChunks.$inferSelect)[]) {
   const db = getDb();
-  const toScore = chunkRows.filter((c) => c.maxCardSimilarity === null && !c.usedForGeneration);
+  // Always rescore every not-yet-used chunk, not just ones scored null
+  // before — the active pool grows with each ingestion run (including
+  // this script's own prior runs), so a chunk that looked novel last time
+  // may now overlap a card approved since. Re-embedding 100-200 chunks
+  // locally is cheap; serving a stale "novel" verdict isn't.
+  const toScore = chunkRows.filter((c) => !c.usedForGeneration);
   if (toScore.length === 0) return;
 
   console.log(`Scoring novelty for ${toScore.length} chunk(s) against the active card pool...`);
