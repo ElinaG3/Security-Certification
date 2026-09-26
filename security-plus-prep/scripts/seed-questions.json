@@ -1611,7 +1611,7 @@
   },
   {
     "id": 116,
-    "domain": "Governance, Risk, & Compliance",
+    "domain": "Security Program Management and Oversight",
     "topic": "Governance",
     "question": "Information security governance ensures:",
     "options": [
@@ -1625,7 +1625,7 @@
   },
   {
     "id": 117,
-    "domain": "Governance, Risk, & Compliance",
+    "domain": "Security Program Management and Oversight",
     "topic": "Governance",
     "question": "A CISO (Chief Information Security Officer) reports to:",
     "options": [
@@ -1639,7 +1639,7 @@
   },
   {
     "id": 118,
-    "domain": "Governance, Risk, & Compliance",
+    "domain": "Security Program Management and Oversight",
     "topic": "Risk Management",
     "question": "Risk mitigation involves:",
     "options": [
@@ -1653,7 +1653,7 @@
   },
   {
     "id": 119,
-    "domain": "Governance, Risk, & Compliance",
+    "domain": "Security Program Management and Oversight",
     "topic": "Risk Management",
     "question": "Risk avoidance means:",
     "options": [
@@ -1667,7 +1667,7 @@
   },
   {
     "id": 120,
-    "domain": "Governance, Risk, & Compliance",
+    "domain": "Security Program Management and Oversight",
     "topic": "Risk Management",
     "question": "Risk transfer involves:",
     "options": [
@@ -1681,7 +1681,7 @@
   },
   {
     "id": 121,
-    "domain": "Governance, Risk, & Compliance",
+    "domain": "Security Program Management and Oversight",
     "topic": "Compliance Frameworks",
     "question": "SOC 2 (Service Organization Control 2) is typically for:",
     "options": [
@@ -1695,7 +1695,7 @@
   },
   {
     "id": 122,
-    "domain": "Governance, Risk, & Compliance",
+    "domain": "Security Program Management and Oversight",
     "topic": "Compliance Frameworks",
     "question": "PCI DSS (Payment Card Industry Data Security Standard) applies to organizations that:",
     "options": [
@@ -1709,7 +1709,7 @@
   },
   {
     "id": 123,
-    "domain": "Governance, Risk, & Compliance",
+    "domain": "Security Program Management and Oversight",
     "topic": "Privacy Regulations",
     "question": "GDPR requires organizations to:",
     "options": [
@@ -1723,7 +1723,7 @@
   },
   {
     "id": 124,
-    "domain": "Governance, Risk, & Compliance",
+    "domain": "Security Program Management and Oversight",
     "topic": "Privacy Regulations",
     "question": "What is the GDPR's \"right to be forgotten\"?",
     "options": [
@@ -1737,7 +1737,7 @@
   },
   {
     "id": 125,
-    "domain": "Governance, Risk, & Compliance",
+    "domain": "Security Program Management and Oversight",
     "topic": "Privacy Regulations",
     "question": "CCPA (California Consumer Privacy Act) gives consumers:",
     "options": [
@@ -1751,7 +1751,7 @@
   },
   {
     "id": 126,
-    "domain": "Governance, Risk, & Compliance",
+    "domain": "Security Program Management and Oversight",
     "topic": "Incident Disclosure",
     "question": "Most breach notification laws require notification within:",
     "options": [
@@ -1765,7 +1765,7 @@
   },
   {
     "id": 127,
-    "domain": "Governance, Risk, & Compliance",
+    "domain": "Security Program Management and Oversight",
     "topic": "Data Classification",
     "question": "Data classification categories typically include:",
     "options": [
@@ -1779,7 +1779,7 @@
   },
   {
     "id": 128,
-    "domain": "Governance, Risk, & Compliance",
+    "domain": "Security Program Management and Oversight",
     "topic": "Data Handling",
     "question": "Data retention policies specify:",
     "options": [
@@ -1793,7 +1793,7 @@
   },
   {
     "id": 129,
-    "domain": "Governance, Risk, & Compliance",
+    "domain": "Security Program Management and Oversight",
     "topic": "Data Handling",
     "question": "Data sanitization ensures:",
     "options": [
@@ -1807,7 +1807,7 @@
   },
   {
     "id": 130,
-    "domain": "Governance, Risk, & Compliance",
+    "domain": "Security Program Management and Oversight",
     "topic": "Third-Party Risk",
     "question": "Third-party risk management includes:",
     "options": [
@@ -1821,7 +1821,7 @@
   },
   {
     "id": 131,
-    "domain": "Governance, Risk, & Compliance",
+    "domain": "Security Program Management and Oversight",
     "topic": "Third-Party Risk",
     "question": "A vendor assessment typically reviews:",
     "options": [
@@ -1835,7 +1835,7 @@
   },
   {
     "id": 132,
-    "domain": "Governance, Risk, & Compliance",
+    "domain": "Security Program Management and Oversight",
     "topic": "Vendor Management",
     "question": "What is a BAA (Business Associate Agreement)?",
     "options": [
@@ -1849,7 +1849,7 @@
   },
   {
     "id": 133,
-    "domain": "Governance, Risk, & Compliance",
+    "domain": "Security Program Management and Oversight",
     "topic": "Audit and Assessment",
     "question": "An internal audit is typically conducted by:",
     "options": [
@@ -1863,7 +1863,7 @@
   },
   {
     "id": 134,
-    "domain": "Governance, Risk, & Compliance",
+    "domain": "Security Program Management and Oversight",
     "topic": "Audit and Assessment",
     "question": "What is the focus of a compliance audit?",
     "options": [
@@ -1877,7 +1877,7 @@
   },
   {
     "id": 135,
-    "domain": "Governance, Risk, & Compliance",
+    "domain": "Security Program Management and Oversight",
     "topic": "Security Policies",
     "question": "An acceptable use policy (AUP) defines:",
     "options": [
