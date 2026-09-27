@@ -22,6 +22,7 @@ import { getDb } from '../src/db';
 import { cards } from '../src/db/schema';
 import { getCurrentUser } from '../src/lib/auth';
 import { AI_MODELS } from '../src/lib/ai-models';
+import { shuffleChoiceContent } from '../src/lib/option-order';
 import { checkCardConsistency } from './check-card-consistency';
 
 const MODEL = AI_MODELS.content;
@@ -225,7 +226,9 @@ async function generateBatch(slots: Slot[]): Promise<(GeneratedCard | null)[]> {
   }
   return rawCards.map((raw, i) => {
     const parsed = GeneratedCardSchema.safeParse(raw);
-    if (parsed.success) return parsed.data;
+    // Shuffled here, before this draft ever reaches the DB — the model
+    // reliably writes the correct answer first if left to its own devices.
+    if (parsed.success) return shuffleChoiceContent(parsed.data);
     console.log(`  GENERATION PARSE FAILURE for slot ${i} (objective ${slots[i]?.objective}):`);
     console.log(`    ${parsed.error.issues.map((iss) => `${iss.path.join('.')}: ${iss.message}`).join('; ')}`);
     return null;

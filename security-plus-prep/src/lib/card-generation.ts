@@ -8,6 +8,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { AI_MODELS } from './ai-models';
+import { shuffleChoiceContent } from './option-order';
 
 const client = new Anthropic();
 
@@ -115,5 +116,9 @@ export async function generateCardDraft(req: DraftRequest): Promise<GeneratedCar
   if (!parsed.success) {
     throw new Error(`Generation returned malformed data: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`);
   }
-  return parsed.data;
+  // The model reliably writes the correct answer first if left to its own
+  // devices — shuffle before this draft ever reaches the DB rather than
+  // relying on prompt wording to self-randomize (that's exactly the
+  // assumption that caused the original position-leak bug).
+  return shuffleChoiceContent(parsed.data);
 }

@@ -4,6 +4,7 @@ import { getDb } from '../src/db';
 import { cards } from '../src/db/schema';
 import { getCurrentUser } from '../src/lib/auth';
 import { AI_MODELS } from '../src/lib/ai-models';
+import { shuffleChoiceContent } from '../src/lib/option-order';
 
 const MODEL = AI_MODELS.content;
 const BATCH_SIZE = 6;
@@ -210,7 +211,10 @@ async function generateBatch(slots: Slot[]): Promise<GeneratedCard[]> {
   );
   if (!toolUse) throw new Error('No tool_use block in response');
 
-  return BatchResultSchema.parse(toolUse.input).cards;
+  // The model reliably writes the correct answer first if left to its own
+  // devices — shuffle before these drafts ever reach the DB rather than
+  // relying on prompt wording to self-randomize.
+  return BatchResultSchema.parse(toolUse.input).cards.map(shuffleChoiceContent);
 }
 
 function chunk<T>(arr: T[], size: number): T[][] {

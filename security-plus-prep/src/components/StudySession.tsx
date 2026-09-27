@@ -185,11 +185,16 @@ export function StudySession({ initialCards }: { initialCards: PublicCard[] }) {
     setSubmitting(true);
     const gateStart = gateStartedAt ?? Date.now();
     const elaborationSkipped = Date.now() - gateStart < GATE_MS;
+    const optionOrder =
+      card.type === 'multiple_choice' || card.type === 'multiple_select'
+        ? (card.content as PublicMultipleChoiceContent | PublicMultipleSelectContent).optionOrder
+        : undefined;
     const res = await submitAnswer({
       cardId: card.id,
       selected,
       responseMs: pendingResponseMs,
       elaborationSkipped,
+      optionOrder,
     });
     setResult(res);
     setHistory((h) => [...h, { card, selected, result: res }]);

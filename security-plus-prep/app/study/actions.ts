@@ -12,6 +12,7 @@ import {
   computeRatingForPbq,
 } from '@/lib/fsrs';
 import { gradeSubQuestion, gradeRemediationSelect, type OptionGrade } from '@/lib/pbq-grading';
+import { invertOrder, isValidOrder } from '@/lib/option-order';
 import type {
   MultipleChoiceContent,
   MultipleSelectContent,
@@ -90,11 +91,18 @@ export async function submitAnswer({
   selected,
   responseMs,
   elaborationSkipped,
+  optionOrder,
 }: {
   cardId: string;
   selected: number[] | number[][];
   responseMs: number;
   elaborationSkipped: boolean;
+  // Required for multiple_choice/multiple_select: the display permutation
+  // the client was rendered with (see toPublicContent in question-public.ts
+  // and the PublicMultipleChoiceContent/PublicMultipleSelectContent doc
+  // comment). `selected` arrives in DISPLAY order; this is how it's
+  // translated back to STORAGE order for grading below.
+  optionOrder?: number[];
 }): Promise<SubmitAnswerResult> {
   const user = await getCurrentUser();
   const db = getDb();
@@ -108,8 +116,23 @@ export async function submitAnswer({
   const due = cardRow.due <= now;
 
   if (cardRow.type === 'multiple_choice' || cardRow.type === 'multiple_select') {
+    // `content` is the server's own copy of the card, fetched fresh from the
+    // DB above — `content.correct` never comes from the client, and nothing
+    // the client sends can change what `content.correct` is. `optionOrder`
+    // only tells us how to translate the client's DISPLAY-order selection
+    // back to the STORAGE-order indices `content.correct` is expressed in;
+    // it is not itself a source of truth for correctness. Since the render
+    // path (toPublicContent) never sends `correct` or explanations to the
+    // browser before this point, nothing the client holds is correlated
+    // with which index is actually correct — a client can't pick values for
+    // `selected`/`optionOrder` that reliably turn a wrong pick into a
+    // correct grade without already knowing the answer by other means.
     const content = cardRow.content as MultipleChoiceContent | MultipleSelectContent;
-    const sel = selected as number[];
+    if (!isValidOrder(optionOrder, content.options.length)) {
+      throw new Error('Missing or invalid optionOrder for a multiple_choice/multiple_select card');
+    }
+    const displayedSel = selected as number[];
+    const sel = displayedSel.map((displayIndex) => optionOrder[displayIndex]); // -> storage order
     const correct = isChoiceCorrect(cardRow.type, content, sel);
 
     const result: ScheduleResult = due
@@ -137,16 +160,28 @@ export async function submitAnswer({
 
     await persistReview(db, cardId, result);
 
+    // Translate the response back to DISPLAY order (inverse of the
+    // translation above) so it lines up with the `options` array the
+    // client already has — result.correctAnswer / .distractorExplanations
+    // must index into the same shuffled order the client rendered, not the
+    // card's storage order.
+    const displayIndexOf = invertOrder(optionOrder);
+    const storedCorrect =
+      cardRow.type === 'multiple_choice'
+        ? (content as MultipleChoiceContent).correct
+        : (content as MultipleSelectContent).correct;
+
     return {
       kind: 'choice',
       score: correct ? 1 : 0,
       correct,
-      correctAnswer:
-        cardRow.type === 'multiple_choice'
-          ? (content as MultipleChoiceContent).correct
-          : (content as MultipleSelectContent).correct,
+      correctAnswer: Array.isArray(storedCorrect)
+        ? storedCorrect.map((i) => displayIndexOf[i])
+        : displayIndexOf[storedCorrect],
       explanation: content.explanation,
-      distractorExplanations: content.distractorExplanations,
+      distractorExplanations: content.distractorExplanations
+        ? optionOrder.map((storedIndex) => content.distractorExplanations![storedIndex])
+        : undefined,
       mnemonic: cardRow.mnemonic ?? undefined,
     };
   }
