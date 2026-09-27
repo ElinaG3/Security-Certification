@@ -1,13 +1,14 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { submitAnswer, type SubmitAnswerResult } from '../../app/study/actions';
+import { submitAnswer, flagCard, type SubmitAnswerResult } from '../../app/study/actions';
 import type {
   PublicCard,
   PublicMultipleChoiceContent,
   PublicMultipleSelectContent,
   PublicArtifactPbqContent,
   PublicRemediationSelectContent,
+  PublicFillInContent,
 } from '@/lib/question-public';
 import { ArtifactPbqCard } from './pbq/ArtifactPbqCard';
 import { RemediationSelectCard } from './pbq/RemediationSelectCard';
@@ -20,9 +21,11 @@ const SKIP_KEY = 's';
 
 type Phase = 'answering' | 'gated' | 'revealed' | 'summary';
 
+type Selection = number[] | number[][] | string;
+
 interface HistoryEntry {
   card: PublicCard;
-  selected: number[] | number[][];
+  selected: Selection;
   result: SubmitAnswerResult;
 }
 
@@ -30,15 +33,16 @@ function answerText(content: PublicMultipleChoiceContent | PublicMultipleSelectC
   return indices.map((i) => content.options[i]).join(', ') || '(no answer)';
 }
 
-function initialSelected(card: PublicCard): number[] | number[][] {
+function initialSelected(card: PublicCard): Selection {
   if (card.type === 'log_analysis' || card.type === 'config_table') {
     const content = card.content as PublicArtifactPbqContent;
     return content.subQuestions.map(() => []);
   }
+  if (card.type === 'fill_in') return '';
   return [];
 }
 
-function canSubmitCard(card: PublicCard, selected: number[] | number[][]): boolean {
+function canSubmitCard(card: PublicCard, selected: Selection): boolean {
   if (card.type === 'multiple_choice') {
     return (selected as number[]).length === 1;
   }
@@ -48,6 +52,9 @@ function canSubmitCard(card: PublicCard, selected: number[] | number[][]): boole
   }
   if (card.type === 'remediation_select') {
     return true; // an empty/full selection is a valid (poorly-scored) attempt, not a blocked state
+  }
+  if (card.type === 'fill_in') {
+    return (selected as string).trim() !== '';
   }
   const content = card.content as PublicArtifactPbqContent;
   const sel = selected as number[][];
@@ -145,10 +152,48 @@ function ChoiceCardView({
   );
 }
 
+function FillInCardView({
+  content,
+  selected,
+  onChange,
+  locked,
+  result,
+}: {
+  content: PublicFillInContent;
+  selected: string;
+  onChange: (v: string) => void;
+  locked: boolean;
+  result: Extract<SubmitAnswerResult, { kind: 'fill_in' }> | null;
+}) {
+  return (
+    <div>
+      <h2>{content.question}</h2>
+      <input
+        type="text"
+        value={selected}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={locked}
+        autoFocus
+        style={{
+          width: '100%',
+          padding: '10px 12px',
+          border: '1px solid #ccc',
+          borderRadius: 6,
+          font: 'inherit',
+          background: result ? (result.correct ? '#d4f4dd' : '#f8d7da') : '#fff',
+        }}
+      />
+      {result && !result.correct && (
+        <p style={{ fontSize: 13, color: '#666', marginTop: 6 }}>Accepted answer: {result.correctAnswer}</p>
+      )}
+    </div>
+  );
+}
+
 export function StudySession({ initialCards }: { initialCards: PublicCard[] }) {
   const [index, setIndex] = useState(0);
   const [phase, setPhase] = useState<Phase>('answering');
-  const [selected, setSelected] = useState<number[] | number[][]>(() => initialSelected(initialCards[0]));
+  const [selected, setSelected] = useState<Selection>(() => initialSelected(initialCards[0]));
   const [startedAt, setStartedAt] = useState(() => Date.now());
   const [pendingResponseMs, setPendingResponseMs] = useState<number | null>(null);
   const [gateStartedAt, setGateStartedAt] = useState<number | null>(null);
@@ -156,6 +201,8 @@ export function StudySession({ initialCards }: { initialCards: PublicCard[] }) {
   const [result, setResult] = useState<SubmitAnswerResult | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [flaggedIds, setFlaggedIds] = useState<Set<string>>(new Set());
+  const [flagging, setFlagging] = useState(false);
   const revealingRef = useRef(false);
 
   const card = initialCards[index];
@@ -212,6 +259,19 @@ export function StudySession({ initialCards }: { initialCards: PublicCard[] }) {
   const canSubmit = canSubmitCard(card, selected);
   const locked = phase !== 'answering';
 
+  const isFlagged = flaggedIds.has(card.id);
+
+  async function handleFlag() {
+    if (flagging || isFlagged) return;
+    setFlagging(true);
+    try {
+      await flagCard({ cardId: card.id });
+      setFlaggedIds((s) => new Set(s).add(card.id));
+    } finally {
+      setFlagging(false);
+    }
+  }
+
   function handleSubmitClick() {
     const responseMs = Date.now() - startedAt;
     revealingRef.current = false;
@@ -235,9 +295,28 @@ export function StudySession({ initialCards }: { initialCards: PublicCard[] }) {
 
   return (
     <div>
-      <p style={{ color: '#666', marginBottom: 8 }}>
-        {card.domain} — {card.topic} ({index + 1}/{initialCards.length})
-      </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <p style={{ color: '#666', margin: 0 }}>
+          {card.domain} — {card.topic} ({index + 1}/{initialCards.length})
+        </p>
+        <button
+          type="button"
+          onClick={handleFlag}
+          disabled={flagging || isFlagged}
+          title="Pull this card out of rotation — review it later at /review"
+          style={{
+            fontSize: 12,
+            padding: '4px 8px',
+            border: '1px solid #ccc',
+            borderRadius: 6,
+            background: isFlagged ? '#fdf4f4' : '#fff',
+            color: isFlagged ? '#c0392b' : '#666',
+            cursor: flagging || isFlagged ? 'default' : 'pointer',
+          }}
+        >
+          {isFlagged ? '🚩 Flagged' : '🚩 Flag'}
+        </button>
+      </div>
 
       {card.type === 'multiple_choice' || card.type === 'multiple_select' ? (
         <ChoiceCardView
@@ -254,6 +333,14 @@ export function StudySession({ initialCards }: { initialCards: PublicCard[] }) {
           onChange={setSelected}
           locked={locked}
           result={result?.kind === 'remediation' ? result : null}
+        />
+      ) : card.type === 'fill_in' ? (
+        <FillInCardView
+          content={card.content as PublicFillInContent}
+          selected={selected as string}
+          onChange={setSelected}
+          locked={locked}
+          result={result?.kind === 'fill_in' ? result : null}
         />
       ) : (
         <ArtifactPbqCard
@@ -389,6 +476,25 @@ function RemediationResultDetail({
   );
 }
 
+function FillInResultDetail({
+  content,
+  selected,
+  result,
+}: {
+  content: PublicFillInContent;
+  selected: string;
+  result: Extract<SubmitAnswerResult, { kind: 'fill_in' }>;
+}) {
+  return (
+    <>
+      <p style={{ fontWeight: 600, marginBottom: 8 }}>{content.question}</p>
+      <p>Your answer: {selected || '(no answer)'}</p>
+      {!result.correct && <p>Accepted answer: {result.correctAnswer}</p>}
+      <p style={{ color: '#444', marginTop: 8 }}>{result.explanation}</p>
+    </>
+  );
+}
+
 function ResultsEntry({ entry }: { entry: HistoryEntry }) {
   const { card, result } = entry;
   const banner = resultBanner(result);
@@ -404,6 +510,9 @@ function ResultsEntry({ entry }: { entry: HistoryEntry }) {
       {result.kind === 'choice' && <ChoiceResultDetail card={card} result={result} selected={entry.selected as number[]} />}
       {result.kind === 'artifact_pbq' && <ArtifactPbqResultDetail card={card} result={result} />}
       {result.kind === 'remediation' && <RemediationResultDetail card={card} result={result} />}
+      {result.kind === 'fill_in' && (
+        <FillInResultDetail content={card.content as PublicFillInContent} selected={entry.selected as string} result={result} />
+      )}
     </div>
   );
 }

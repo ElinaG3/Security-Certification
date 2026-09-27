@@ -4,6 +4,7 @@ import type {
   QuestionType,
   ArtifactPbqContent,
   RemediationSelectContent,
+  FillInContent,
   PbqArtifact,
   PbqSubQuestion,
 } from '@/db/question-types';
@@ -56,18 +57,24 @@ export interface PublicRemediationSelectContent {
   actions: string[];
 }
 
+export interface PublicFillInContent {
+  question: string;
+}
+
 export type PublicQuestionContent =
   | PublicMultipleChoiceContent
   | PublicMultipleSelectContent
   | PublicArtifactPbqContent
-  | PublicRemediationSelectContent;
+  | PublicRemediationSelectContent
+  | PublicFillInContent;
 
 export type PublicCardType =
   | 'multiple_choice'
   | 'multiple_select'
   | 'log_analysis'
   | 'config_table'
-  | 'remediation_select';
+  | 'remediation_select'
+  | 'fill_in';
 
 export interface PublicCard {
   id: string;
@@ -94,7 +101,12 @@ export function toPublicContent(
     | MultipleSelectContent
     | ArtifactPbqContent
     | RemediationSelectContent
+    | FillInContent
 ): PublicQuestionContent {
+  if (type === 'fill_in') {
+    const c = content as FillInContent;
+    return { question: c.question };
+  }
   if (type === 'multiple_select') {
     const c = content as MultipleSelectContent;
     const optionOrder = randomOrder(c.options.length);

@@ -33,6 +33,7 @@ export async function getDueQueue({
       and(
         eq(cards.userId, userId),
         eq(cards.status, 'active'),
+        eq(cards.flagged, false),
         lte(cards.due, now),
         domain ? eq(cards.domain, domain) : undefined
       )
@@ -114,7 +115,9 @@ export async function getPbqWarmupQueue({
   const rows = await db
     .select()
     .from(cards)
-    .where(and(eq(cards.userId, userId), eq(cards.status, 'active'), inArray(cards.type, PBQ_TYPES)))
+    .where(
+      and(eq(cards.userId, userId), eq(cards.status, 'active'), eq(cards.flagged, false), inArray(cards.type, PBQ_TYPES))
+    )
     .orderBy(asc(cards.due));
 
   const buckets = new Map<string, CardRow[]>();

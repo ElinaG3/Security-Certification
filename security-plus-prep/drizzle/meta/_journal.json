@@ -50,6 +50,13 @@
       "when": 1790200874757,
       "tag": "0006_add_ingested_chunks",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790530629412,
+      "tag": "0007_add_card_flag",
+      "breakpoints": true
     }
   ]
 }

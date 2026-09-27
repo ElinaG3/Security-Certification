@@ -37,6 +37,14 @@ export const cards = pgTable('cards', {
   // 'active' | 'pending' | 'rejected' — auto-generated cards land as 'pending'
   status: text('status').notNull().default('active'),
 
+  // Independent of `status`: a lightweight "pull this out of rotation
+  // without losing FSRS history" toggle, settable both mid-study (one
+  // click while answering) and from the /review spot-check UI. getDueQueue
+  // / getPbqWarmupQueue exclude flagged cards; nothing else about the card
+  // changes, so unflagging fully restores it.
+  flagged: boolean('flagged').notNull().default(false),
+  flagNote: text('flag_note'),
+
   sourceType: text('source_type'), // 'manual' | 'pdf' | 'image' | 'note'
   sourceRef: text('source_ref'), // e.g. file id + page, or note id
 

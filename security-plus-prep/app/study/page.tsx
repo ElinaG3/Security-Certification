@@ -10,6 +10,7 @@ import type {
   MultipleSelectContent,
   ArtifactPbqContent,
   RemediationSelectContent,
+  FillInContent,
 } from '@/db/question-types';
 import { StudySession } from '@/components/StudySession';
 
@@ -19,6 +20,7 @@ const SUPPORTED_TYPES = [
   'log_analysis',
   'config_table',
   'remediation_select',
+  'fill_in',
 ] as const;
 
 export default async function StudyPage({
@@ -51,7 +53,12 @@ export default async function StudyPage({
       type: c.type,
       content: toPublicContent(
         c.type,
-        c.content as MultipleChoiceContent | MultipleSelectContent | ArtifactPbqContent | RemediationSelectContent
+        c.content as
+          | MultipleChoiceContent
+          | MultipleSelectContent
+          | ArtifactPbqContent
+          | RemediationSelectContent
+          | FillInContent
       ),
     }));
 
@@ -76,6 +83,8 @@ export default async function StudyPage({
           PBQ warm-up
         </Link>
         <Link href="/create">+ Create card</Link>
+        <Link href="/search">Search notes</Link>
+        <Link href="/review">Review</Link>
       </nav>
 
       {publicCards.length === 0 ? (

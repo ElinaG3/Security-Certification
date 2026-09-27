@@ -13,12 +13,27 @@ import {
 } from '@/lib/fsrs';
 import { gradeSubQuestion, gradeRemediationSelect, type OptionGrade } from '@/lib/pbq-grading';
 import { invertOrder, isValidOrder } from '@/lib/option-order';
+import { gradeFillIn } from '@/lib/fill-in-grading';
 import type {
   MultipleChoiceContent,
   MultipleSelectContent,
   ArtifactPbqContent,
   RemediationSelectContent,
+  FillInContent,
 } from '@/db/question-types';
+
+// One-click "pull this out of rotation" while studying — the main defense
+// against a weak card, since cards are seen one at a time in real use.
+// Independent of status/FSRS state: getDueQueue/getPbqWarmupQueue exclude
+// flagged cards, nothing else about the card changes, and it can be
+// unflagged from /review at any time.
+export async function flagCard({ cardId, note }: { cardId: string; note?: string }): Promise<void> {
+  const user = await getCurrentUser();
+  const db = getDb();
+  const [cardRow] = await db.select().from(cards).where(eq(cards.id, cardId));
+  if (!cardRow || cardRow.userId !== user.id) throw new Error('Card not found');
+  await db.update(cards).set({ flagged: true, flagNote: note ?? null }).where(eq(cards.id, cardId));
+}
 
 export type SubmitAnswerResult =
   | {
@@ -41,6 +56,14 @@ export type SubmitAnswerResult =
       score: number;
       correct: boolean;
       options: OptionGrade[];
+    }
+  | {
+      kind: 'fill_in';
+      score: number;
+      correct: boolean;
+      correctAnswer: string; // first accepted answer — display purposes only
+      explanation: string;
+      matchedVia: 'string' | 'ai';
     };
 
 function isChoiceCorrect(
@@ -94,7 +117,7 @@ export async function submitAnswer({
   optionOrder,
 }: {
   cardId: string;
-  selected: number[] | number[][];
+  selected: number[] | number[][] | string;
   responseMs: number;
   elaborationSkipped: boolean;
   // Required for multiple_choice/multiple_select: the display permutation
@@ -263,6 +286,46 @@ export async function submitAnswer({
     await persistReview(db, cardId, result);
 
     return { kind: 'remediation', score, correct, options };
+  }
+
+  if (cardRow.type === 'fill_in') {
+    const content = cardRow.content as FillInContent;
+    const sel = (typeof selected === 'string' ? selected : '').trim();
+    const { correct, matchedVia } = await gradeFillIn(sel, content.acceptedAnswers);
+
+    const result: ScheduleResult = due
+      ? await scheduleReview({
+          db,
+          cardRow,
+          userId: user.id,
+          questionType: cardRow.type,
+          correct,
+          responseMs,
+          elaborationSkipped,
+        })
+      : {
+          cardUpdate: null,
+          logInsert: logUnscheduledReview({
+            cardRow,
+            userId: user.id,
+            rating: await computeRatingForChoice(db, user.id, cardRow.type, correct, responseMs),
+            responseMs,
+            elaborationSkipped,
+            subResults: null,
+            now,
+          }).logInsert,
+        };
+
+    await persistReview(db, cardId, result);
+
+    return {
+      kind: 'fill_in',
+      score: correct ? 1 : 0,
+      correct,
+      correctAnswer: content.acceptedAnswers[0],
+      explanation: content.explanation,
+      matchedVia,
+    };
   }
 
   throw new Error(`Unsupported question type for review: ${cardRow.type}`);
