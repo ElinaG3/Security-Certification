@@ -85,6 +85,7 @@ export default async function StudyPage({
         <Link href="/create">+ Create card</Link>
         <Link href="/search">Search notes</Link>
         <Link href="/review">Review</Link>
+        <Link href="/topics">Topics</Link>
       </nav>
 
       {publicCards.length === 0 ? (

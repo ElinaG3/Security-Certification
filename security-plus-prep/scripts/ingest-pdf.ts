@@ -37,6 +37,7 @@ import { getCurrentUser } from '../src/lib/auth';
 import { AI_MODELS } from '../src/lib/ai-models';
 import { embedText, cosineSimilarity } from '../src/lib/embeddings';
 import { shuffleChoiceContent } from '../src/lib/option-order';
+import { domainForObjective as sharedDomainForObjective } from '../src/lib/domains';
 import { checkCardConsistency } from './check-card-consistency';
 import type { MultipleChoiceContent, MultipleSelectContent } from '../src/db/question-types';
 
@@ -65,18 +66,9 @@ const DENYLIST_PATTERNS = [/sy0[-_ ]?601/i];
 
 const client = new Anthropic();
 
-const DOMAIN_BY_OBJECTIVE_PREFIX: Record<string, string> = {
-  '1': 'General Security Concepts',
-  '2': 'Threats, Vulnerabilities, & Mitigations',
-  '3': 'Security Architecture',
-  '4': 'Security Operations',
-  '5': 'Security Program Management and Oversight',
-};
-
 function domainForObjective(objective: string | null): string | null {
   if (!objective) return null;
-  const prefix = objective.split('.')[0];
-  return DOMAIN_BY_OBJECTIVE_PREFIX[prefix] ?? null;
+  return sharedDomainForObjective(objective);
 }
 
 // ---------------------------------------------------------------------
