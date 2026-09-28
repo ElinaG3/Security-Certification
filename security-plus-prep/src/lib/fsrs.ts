@@ -22,6 +22,17 @@ const DB_TO_STATE: Record<string, State> = {
 
 type CardRow = typeof cards.$inferSelect;
 
+// Retrievability (probability of recall right now) for one card, reusing
+// the SAME scheduler instance/parameters real scheduling uses — not a
+// re-derivation. null for a card that's never been reviewed (reps === 0):
+// retention isn't a meaningful concept yet for a card with no review
+// history, so it's excluded rather than defaulted to 0 or 1.
+export function computeRetrievability(row: CardRow, now: Date = new Date()): number | null {
+  if (row.reps === 0 || !row.lastReview) return null;
+  const elapsedDays = Math.max(0, (now.getTime() - row.lastReview.getTime()) / (1000 * 60 * 60 * 24));
+  return scheduler.forgetting_curve(elapsedDays, row.stability);
+}
+
 function rowToCard(row: CardRow): Card {
   return {
     due: row.due,

@@ -36,7 +36,7 @@ function questionText(row: typeof cards.$inferSelect): string {
 // falls back to whatever section titles ingestedChunks happened to collect
 // for that objective (from Messer's notes). Some objectives will have none
 // (no source chunks yet) and show just the bare number.
-async function objectiveLabels(): Promise<Map<string, string>> {
+export async function objectiveLabels(): Promise<Map<string, string>> {
   const db = getDb();
   const chunks = await db
     .select({ objective: ingestedChunks.objective, sectionTitle: ingestedChunks.sectionTitle })
