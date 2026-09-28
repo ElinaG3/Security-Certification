@@ -11,12 +11,13 @@ import { writeFileSync } from 'node:fs';
 import { eq } from 'drizzle-orm';
 import { getDb } from '../src/db';
 import { cards } from '../src/db/schema';
-import { checkCardConsistency } from '../src/lib/card-consistency';
+import { checkCardConsistency, checkFillInConsistency } from '../src/lib/card-consistency';
 import type {
   MultipleChoiceContent,
   MultipleSelectContent,
   ArtifactPbqContent,
   RemediationSelectContent,
+  FillInContent,
   PbqArtifact,
   PbqSubQuestion,
 } from '../src/db/question-types';
@@ -161,6 +162,9 @@ function checkAnyCardConsistency(content: unknown, type: string): string[] {
   if (type === 'remediation_select') {
     return checkRemediationConsistency(content as RemediationSelectContent);
   }
+  if (type === 'fill_in') {
+    return checkFillInConsistency(content as FillInContent);
+  }
   return checkCardConsistency(content as Content, type);
 }
 
@@ -173,12 +177,19 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-function formatCardFull(card: { domain: string; topic: string; objective: string | null; authoredDifficulty: string | null; type: string; content: unknown }): string {
+type FormattableCard = { domain: string; topic: string; objective: string | null; authoredDifficulty: string | null; type: string; content: unknown };
+
+function formatCardFull(card: FormattableCard): string {
+  const header = `\n--- [${card.domain}] ${card.topic}${card.objective ? ` (obj ${card.objective})` : ''}${card.authoredDifficulty ? `, ${card.authoredDifficulty}` : ''}, ${card.type}`;
+
+  if (card.type === 'fill_in') {
+    const content = card.content as FillInContent;
+    return [header, `Q: ${content.question}`, `Accepted: ${content.acceptedAnswers.map((a) => `"${a}"`).join(', ')}`, `Explanation: ${content.explanation}`].join('\n');
+  }
+
   const content = card.content as Content;
   const correctIndices = Array.isArray(content.correct) ? content.correct : [content.correct];
-  const lines: string[] = [];
-  lines.push(`\n--- [${card.domain}] ${card.topic}${card.objective ? ` (obj ${card.objective})` : ''}${card.authoredDifficulty ? `, ${card.authoredDifficulty}` : ''}, ${card.type}`);
-  lines.push(`Q: ${content.question}`);
+  const lines: string[] = [header, `Q: ${content.question}`];
   content.options.forEach((opt, idx) => {
     const marker = correctIndices.includes(idx) ? '(correct)' : '(wrong)';
     lines.push(`  ${idx} ${marker}: ${opt}`);
@@ -190,14 +201,18 @@ function formatCardFull(card: { domain: string; topic: string; objective: string
   return lines.join('\n');
 }
 
-// Writes a random-sample dump of MC/MS cards to a file for manual semantic
-// review (the structural check can't catch an explanation that doesn't
-// actually match its option — that needs a human read). Shared by section B
-// (new pending cards -> samples-new.txt) and section C (legacy/seeded
-// active cards -> samples-legacy.txt).
+const FORMATTABLE_TYPES = ['multiple_choice', 'multiple_select', 'fill_in'];
+
+// Writes a random-sample dump of cards to a file for manual semantic review
+// (the structural check can't catch an explanation that doesn't actually
+// match its option, or a fill_in question whose accepted answers don't
+// actually fit — that needs a human read). Shared by section B (new
+// pending cards -> samples-new.txt) and section C (legacy/seeded active
+// cards -> samples-legacy.txt). PBQ types aren't included — formatCardFull
+// only knows the option-list and fill_in shapes.
 function writeSampleFile(path: string, header: string, sampleCards: (typeof cards.$inferSelect)[]): number {
-  const mcMsCards = sampleCards.filter((c) => c.type === 'multiple_choice' || c.type === 'multiple_select');
-  const sample = shuffle(mcMsCards).slice(0, 20);
+  const formattable = sampleCards.filter((c) => FORMATTABLE_TYPES.includes(c.type));
+  const sample = shuffle(formattable).slice(0, 20);
   const text = [header, ...sample.map(formatCardFull)].join('\n');
   writeFileSync(path, text + '\n');
   return sample.length;

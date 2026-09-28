@@ -8,7 +8,7 @@
 // the manual card-creation feature (app/create/actions.ts) — one
 // implementation, not a fork per call site.
 
-import type { MultipleChoiceContent, MultipleSelectContent } from '@/db/question-types';
+import type { MultipleChoiceContent, MultipleSelectContent, FillInContent } from '@/db/question-types';
 
 type Content = MultipleChoiceContent | MultipleSelectContent;
 
@@ -72,6 +72,39 @@ export function checkCardConsistency(content: Content, type: string): string[] {
         }
       }
     }
+  }
+
+  return issues;
+}
+
+// fill_in has none of multiple_choice/multiple_select's options/correct-index
+// shape, so it gets its own checker rather than being forced through
+// checkCardConsistency above (which would crash on content.options being
+// undefined).
+export function checkFillInConsistency(content: FillInContent): string[] {
+  const issues: string[] = [];
+
+  if (!content.question || content.question.trim() === '') {
+    issues.push('question is empty');
+  }
+
+  if (!content.acceptedAnswers || content.acceptedAnswers.length === 0) {
+    issues.push('acceptedAnswers is empty — a fill_in card needs at least one accepted answer');
+  } else {
+    const seen = new Set<string>();
+    content.acceptedAnswers.forEach((a) => {
+      if (!a || a.trim() === '') {
+        issues.push('acceptedAnswers contains an empty entry');
+        return;
+      }
+      const key = a.trim().toLowerCase();
+      if (seen.has(key)) issues.push(`duplicate accepted answer: "${a}"`);
+      seen.add(key);
+    });
+  }
+
+  if (!content.explanation || content.explanation.trim() === '') {
+    issues.push('explanation is empty');
   }
 
   return issues;
