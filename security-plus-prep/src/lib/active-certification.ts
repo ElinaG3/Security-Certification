@@ -27,6 +27,12 @@ export interface CertDomain {
 export interface CertConfig {
   sessionSize: number;
   minMultiSelect: number;
+  // Minimum typed-answer (fill_in) cards guaranteed per due-queue session,
+  // same composition-guarantee mechanism as minMultiSelect. Optional/
+  // defaults to 0 so a certification created before this existed (or a
+  // brand-new one with no fill_in cards yet) doesn't need a migration —
+  // see getDueQueue's `?? 0` fallback.
+  minFillIn?: number;
   difficultyMix: Record<string, number>;
 }
 

@@ -69,39 +69,44 @@ export async function getDueQueue({
     round++;
   }
 
-  return ensureMinMultiSelect(interleaved, due, effectiveLimit, cert.config.minMultiSelect);
+  // Applied in sequence, each protecting every type already guaranteed by
+  // an earlier pass from being swapped back out — otherwise satisfying
+  // minFillIn could silently undo minMultiSelect's guarantee (and vice
+  // versa if the order were reversed).
+  const withMinMs = ensureMinOfType(interleaved, due, effectiveLimit, cert.config.minMultiSelect, 'multiple_select', []);
+  return ensureMinOfType(withMinMs, due, effectiveLimit, cert.config.minFillIn ?? 0, 'fill_in', ['multiple_select']);
 }
 
-// Domain-interleaving alone can leave a session with zero or one
-// multiple_select card just because none happened to be due early in a
-// domain's bucket — the composition guarantee (>= minMultiSelect per
-// session) must not be left to that draw. If the interleaved queue is
-// short on multiple_select cards, top it up from the full due pool by
-// swapping into the least-urgent (tail-most) non-multiple_select slots,
-// which minimizes disruption to the domain-interleaved ordering. This can
-// only guarantee as many as are actually due — if fewer than
-// minMultiSelect multiple_select cards are due system-wide, it tops up as
-// many as it can and leaves the rest of the queue untouched.
-function ensureMinMultiSelect(queue: CardRow[], due: CardRow[], limit: number, minMultiSelect: number): CardRow[] {
-  const currentMsCount = queue.filter((c) => c.type === 'multiple_select').length;
-  if (currentMsCount >= minMultiSelect) return queue;
+// Domain-interleaving alone can leave a session with zero or one card of a
+// given type just because none happened to be due early in a domain's
+// bucket — a composition guarantee (>= minCount of `type` per session)
+// must not be left to that draw. If the interleaved queue is short, top
+// it up from the full due pool by swapping into the least-urgent
+// (tail-most) slot of any type NOT in `protectedTypes` (never `type`
+// itself, and never a type an earlier guarantee already secured), which
+// minimizes disruption to the domain-interleaved ordering. This can only
+// guarantee as many as are actually due — if fewer than minCount cards of
+// `type` are due system-wide, it tops up as many as it can and leaves the
+// rest of the queue untouched.
+function ensureMinOfType(queue: CardRow[], due: CardRow[], limit: number, minCount: number, type: string, protectedTypes: string[]): CardRow[] {
+  const currentCount = queue.filter((c) => c.type === type).length;
+  if (currentCount >= minCount) return queue;
 
   const queueIds = new Set(queue.map((c) => c.id));
-  const extraMs = due
-    .filter((c) => c.type === 'multiple_select' && !queueIds.has(c.id))
-    .slice(0, minMultiSelect - currentMsCount);
-  if (extraMs.length === 0) return queue;
+  const extra = due.filter((c) => c.type === type && !queueIds.has(c.id)).slice(0, minCount - currentCount);
+  if (extra.length === 0) return queue;
 
   const result = [...queue];
+  const nonSwappable = new Set([type, ...protectedTypes]);
   const swapIndices = result
     .map((c, i) => i)
-    .filter((i) => result[i].type !== 'multiple_select')
+    .filter((i) => !nonSwappable.has(result[i].type))
     .reverse();
 
-  for (const extra of extraMs) {
+  for (const item of extra) {
     const idx = swapIndices.shift();
-    if (idx === undefined) break; // no more non-multiple_select slots to swap out
-    result[idx] = extra;
+    if (idx === undefined) break; // no more swappable slots left
+    result[idx] = item;
   }
 
   return result.slice(0, limit);
