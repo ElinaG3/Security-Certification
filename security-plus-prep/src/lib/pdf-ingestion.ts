@@ -11,7 +11,6 @@
 // every chunk records the page range its text actually came from — what
 // makes the Library's "open this PDF at the relevant page" possible.
 
-import { PDFParse } from 'pdf-parse';
 import { and, eq } from 'drizzle-orm';
 import { getDb } from '@/db';
 import { ingestedChunks, cards } from '@/db/schema';
@@ -26,7 +25,28 @@ export interface RawChunk {
   endPage: number;
 }
 
+// pdf-parse re-exports pdfjs-dist's full "legacy" build (rendering
+// included), whose canvas module runs `new DOMMatrix()` unconditionally at
+// import time to size a scale matrix — real for rendering, dead code for
+// us since we only call getText(). A native canvas package would normally
+// supply DOMMatrix, but it isn't reliably present in Vercel's serverless
+// bundle (works locally, 500s in prod: "ReferenceError: DOMMatrix is not
+// defined"). A no-op stub is safe because the rendering path that
+// constructs real matrices from it never executes on the getText() path.
+// Importing pdf-parse dynamically (not statically) also keeps this whole
+// dependency chain out of routes that never parse a PDF, like the
+// /library list view.
+function polyfillDomMatrix() {
+  if (typeof globalThis.DOMMatrix !== 'undefined') return;
+  class DOMMatrixStub {
+    constructor(..._args: unknown[]) {}
+  }
+  (globalThis as unknown as { DOMMatrix: unknown }).DOMMatrix = DOMMatrixStub;
+}
+
 export async function extractPdfPages(buffer: Buffer): Promise<{ pages: { num: number; text: string }[]; pageCount: number }> {
+  polyfillDomMatrix();
+  const { PDFParse } = await import('pdf-parse');
   const parser = new PDFParse({ data: buffer });
   const extracted = await parser.getText();
   await parser.destroy();
