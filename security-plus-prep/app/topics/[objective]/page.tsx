@@ -21,6 +21,31 @@ export default async function TopicDetailPage({ params }: { params: Promise<{ ob
       <h1 style={{ marginBottom: 4 }}>{topic.label}</h1>
       <p style={{ color: '#666', marginBottom: 24 }}>{topic.domain}</p>
 
+      {topic.pdfReferences.length > 0 && (
+        <section style={{ marginBottom: 32 }}>
+          <h2 style={{ fontSize: 16, marginBottom: 10 }}>Read in Library</h2>
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+            {topic.pdfReferences.map((ref, i) => (
+              <li key={i} style={{ marginBottom: 6 }}>
+                <Link
+                  href={`/library/${ref.pdfId}?page=${ref.startPage}`}
+                  style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 10px', border: '1px solid #eee', borderRadius: 6, gap: 8, flexWrap: 'wrap' }}
+                >
+                  <span>
+                    {ref.filename}
+                    {ref.sectionTitle && ` — ${ref.sectionTitle}`}
+                  </span>
+                  <span style={{ color: '#999', fontSize: 13 }}>
+                    page {ref.startPage}
+                    {ref.endPage !== ref.startPage ? `–${ref.endPage}` : ''}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <section style={{ marginBottom: 32 }}>
         <h2 style={{ fontSize: 16, marginBottom: 10 }}>Cards ({topic.cards.length})</h2>
         {topic.cards.length === 0 ? (

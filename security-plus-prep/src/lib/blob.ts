@@ -10,3 +10,13 @@ export async function uploadRecallImage(userId: string, file: File, kind: 'drawi
   const blob = await put(path, file, { access: 'public' });
   return blob.url;
 }
+
+// Cert-scoped (not user-scoped) — a PDF belongs to a certification, same
+// as every other content table now. Public access, same as recall images:
+// the in-app viewer renders it via a plain <iframe src>, which needs a
+// directly-fetchable URL.
+export async function uploadCertificationPdf(certificationId: string, file: File): Promise<string> {
+  const path = `library/${certificationId}/${randomUUID()}-${file.name}`;
+  const blob = await put(path, file, { access: 'public' });
+  return blob.url;
+}

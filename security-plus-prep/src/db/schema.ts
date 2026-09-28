@@ -55,6 +55,20 @@ export const objectives = pgTable('objectives', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// One row per uploaded source PDF (Home-restructure Step 2 — the Library).
+// The file itself lives in Vercel Blob; this row is the certification-
+// scoped catalog entry plus enough metadata (pageCount) for the in-app
+// viewer's page-jump links (browser-native, via a `#page=N` URL fragment
+// on the blob URL — no PDF.js needed).
+export const pdfLibrary = pgTable('pdf_library', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  certificationId: uuid('certification_id').notNull().references(() => certifications.id),
+  filename: text('filename').notNull(),
+  blobUrl: text('blob_url').notNull(),
+  pageCount: integer('page_count').notNull(),
+  uploadedAt: timestamp('uploaded_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // `type` + `content` form a discriminated union at the application layer
 // (see src/db/question-types.ts) so new question types never require a migration.
 export const cards = pgTable('cards', {
@@ -208,6 +222,16 @@ export const ingestedChunks = pgTable('ingested_chunks', {
 
   sourceFile: text('source_file').notNull(),
   examVersion: text('exam_version').notNull().default('SY0-701'),
+
+  // Nullable: chunks ingested before the Library existed (the original CLI
+  // path, reading a local file with no pdf_library row) have no pdf link —
+  // still fully usable for search/generation, just without a "read this in
+  // the Library" deep link. startPage/endPage are the page range the
+  // chunk's text was actually extracted from (pdf-parse's per-page text),
+  // for the viewer's #page=N jump.
+  pdfId: uuid('pdf_id').references(() => pdfLibrary.id),
+  startPage: integer('start_page'),
+  endPage: integer('end_page'),
 
   objective: text('objective'), // e.g. '1.3', parsed from the source's own section headers
   sectionTitle: text('section_title'),

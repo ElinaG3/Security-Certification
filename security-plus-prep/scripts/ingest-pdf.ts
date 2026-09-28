@@ -34,17 +34,15 @@ import { readFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
-import { PDFParse } from 'pdf-parse';
-import { eq, and, sql } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import { getDb } from '../src/db';
 import { cards, ingestedChunks } from '../src/db/schema';
 import { getCurrentUser } from '../src/lib/auth';
 import { AI_MODELS } from '../src/lib/ai-models';
-import { embedText, cosineSimilarity } from '../src/lib/embeddings';
 import { shuffleChoiceContent } from '../src/lib/option-order';
+import { extractPdfPages, chunkPdfPages, persistChunks, scoreChunkNovelty } from '../src/lib/pdf-ingestion';
 import { parseCertificationIdArg, resolveCliCertification, domainForObjectiveIn, type CliCertification } from './cli-certification';
 import { checkCardConsistency } from './check-card-consistency';
-import type { MultipleChoiceContent, MultipleSelectContent } from '../src/db/question-types';
 
 const MODEL = AI_MODELS.content;
 const BATCH_SIZE = 5;
@@ -70,127 +68,6 @@ const DEFAULT_PDF_PATH = '/home/elina/Downloads/professor-messer-sy0-701-comptia
 const DENYLIST_PATTERNS = [/sy0[-_ ]?601/i];
 
 const client = new Anthropic();
-
-// ---------------------------------------------------------------------
-// 1-2. Extraction + chunking
-// ---------------------------------------------------------------------
-
-type RawChunk = { objective: string; sectionTitle: string; content: string };
-
-const SECTION_HEADER_RE = /^(\d\.\d) - (.+)$/;
-
-// One chunk per top-level section header ("1.3 - Change Management").
-// An earlier sub-heading-level split (on prose lines immediately followed
-// by a "•" bullet) was tried and discarded: it produced 888 chunks, many
-// under 100 chars — Messer's outline uses too many short rhetorical-bullet
-// lines that look like sub-headings but aren't. Section-level gives 163
-// chunks at a median ~1500 chars, each a coherent, single-concept unit.
-function chunkText(fullText: string): RawChunk[] {
-  const cleaned = fullText.replace(/\n?-- \d+ of \d+ --\n?/g, '\n');
-  const lines = cleaned.split('\n');
-
-  const chunks: RawChunk[] = [];
-  let objective: string | null = null;
-  let sectionTitle = '';
-  let buffer: string[] = [];
-
-  const flush = () => {
-    const text = buffer.join('\n').trim();
-    if (objective && text.length > 40) {
-      chunks.push({ objective, sectionTitle, content: text });
-    }
-    buffer = [];
-  };
-
-  for (const rawLine of lines) {
-    const line = rawLine.trim();
-    // Real body headers ("1.3 - Change Management") never carry the
-    // trailing "\t<page>" that the table-of-contents entries do.
-    const headerMatch = line.match(SECTION_HEADER_RE);
-    if (headerMatch && !rawLine.includes('\t')) {
-      flush();
-      objective = headerMatch[1];
-      sectionTitle = headerMatch[2];
-      continue;
-    }
-
-    if (objective === null) continue; // still in front matter / table of contents
-    if (line.length > 0) buffer.push(line);
-  }
-  flush();
-
-  return chunks;
-}
-
-// ---------------------------------------------------------------------
-// 3-4. Persist chunks, embed, score novelty against active cards
-// ---------------------------------------------------------------------
-
-function cardEmbeddingText(content: MultipleChoiceContent | MultipleSelectContent): string {
-  return [content.question, ...content.options, content.explanation].join(' ');
-}
-
-async function loadOrCreateChunks(sourceFile: string, rawChunks: RawChunk[], certificationId: string) {
-  const db = getDb();
-  const existing = await db
-    .select()
-    .from(ingestedChunks)
-    .where(and(eq(ingestedChunks.sourceFile, sourceFile), eq(ingestedChunks.certificationId, certificationId)));
-  if (existing.length > 0) {
-    console.log(`Found ${existing.length} previously-ingested chunk(s) for ${sourceFile} — reusing, skipping re-extraction.`);
-    return existing;
-  }
-
-  console.log(`Embedding ${rawChunks.length} new chunk(s)...`);
-  const rows: (typeof ingestedChunks.$inferSelect)[] = [];
-  for (const [i, raw] of rawChunks.entries()) {
-    if (i % 20 === 0) console.log(`  ${i}/${rawChunks.length}...`);
-    const embedding = await embedText(`${raw.sectionTitle}. ${raw.content}`);
-    const [inserted] = await db
-      .insert(ingestedChunks)
-      .values({
-        certificationId,
-        sourceFile,
-        objective: raw.objective,
-        sectionTitle: raw.sectionTitle,
-        content: raw.content,
-        embedding,
-      })
-      .returning();
-    rows.push(inserted);
-  }
-  return rows;
-}
-
-async function scoreNovelty(chunkRows: (typeof ingestedChunks.$inferSelect)[], certificationId: string) {
-  const db = getDb();
-  // Always rescore every not-yet-used chunk, not just ones scored null
-  // before — the active pool grows with each ingestion run (including
-  // this script's own prior runs), so a chunk that looked novel last time
-  // may now overlap a card approved since. Re-embedding 100-200 chunks
-  // locally is cheap; serving a stale "novel" verdict isn't.
-  const toScore = chunkRows.filter((c) => !c.usedForGeneration);
-  if (toScore.length === 0) return;
-
-  console.log(`Scoring novelty for ${toScore.length} chunk(s) against the active card pool...`);
-  const activeCards = await db
-    .select()
-    .from(cards)
-    .where(and(eq(cards.status, 'active'), eq(cards.certificationId, certificationId)));
-  const mcMs = activeCards.filter((c) => c.type === 'multiple_choice' || c.type === 'multiple_select');
-  const cardEmbeddings: number[][] = [];
-  for (const card of mcMs) {
-    cardEmbeddings.push(await embedText(cardEmbeddingText(card.content as MultipleChoiceContent | MultipleSelectContent)));
-  }
-
-  for (const chunk of toScore) {
-    if (!chunk.embedding) continue;
-    let max = 0;
-    for (const ce of cardEmbeddings) max = Math.max(max, cosineSimilarity(chunk.embedding as number[], ce));
-    await db.update(ingestedChunks).set({ maxCardSimilarity: max }).where(eq(ingestedChunks.id, chunk.id));
-    chunk.maxCardSimilarity = max;
-  }
-}
 
 // ---------------------------------------------------------------------
 // 5. Card generation — same style/qualifier/length rules as
@@ -461,16 +338,18 @@ async function main() {
 
   console.log(`Extracting text from ${sourceFile}...`);
   const buffer = await readFile(sourcePath);
-  const parser = new PDFParse({ data: buffer });
-  const extracted = await parser.getText();
-  await parser.destroy();
-  console.log(`${extracted.total} page(s) extracted.`);
+  const { pages, pageCount } = await extractPdfPages(buffer);
+  console.log(`${pageCount} page(s) extracted.`);
 
-  const rawChunks = chunkText(extracted.text);
+  const rawChunks = chunkPdfPages(pages);
   console.log(`Parsed ${rawChunks.length} content chunk(s).`);
 
-  const chunkRows = await loadOrCreateChunks(sourceFile, rawChunks, cert.id);
-  await scoreNovelty(chunkRows, cert.id);
+  // No Library entry (pdfId: null) — this is a local file, never uploaded
+  // to Blob, so there's no in-app-viewable PDF for these chunks to link
+  // to. Upload the same file through the Library UI instead if you want
+  // page-linked chunks from it.
+  const chunkRows = await persistChunks({ certificationId: cert.id, pdfId: null, sourceFile, rawChunks });
+  await scoreChunkNovelty(cert.id, chunkRows);
 
   const eligible = chunkRows
     .filter((c) => !c.usedForGeneration && c.objective !== null)

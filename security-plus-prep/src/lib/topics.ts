@@ -1,6 +1,6 @@
 import { and, eq, isNotNull } from 'drizzle-orm';
 import { getDb } from '@/db';
-import { cards, ingestedChunks } from '@/db/schema';
+import { cards, ingestedChunks, pdfLibrary } from '@/db/schema';
 import { getActiveCertificationId, domainForObjectiveActive } from './active-certification';
 import type { MultipleChoiceContent, MultipleSelectContent } from '@/db/question-types';
 
@@ -20,8 +20,17 @@ export interface TopicCard {
   question: string;
 }
 
+export interface TopicPdfReference {
+  pdfId: string;
+  filename: string;
+  sectionTitle: string | null;
+  startPage: number;
+  endPage: number;
+}
+
 export interface TopicDetail extends TopicSummary {
   cards: TopicCard[];
+  pdfReferences: TopicPdfReference[];
 }
 
 function questionText(row: typeof cards.$inferSelect): string {
@@ -93,15 +102,32 @@ export async function listTopics(userId: string): Promise<{ topics: TopicSummary
 
 export async function getTopic(userId: string, objective: string): Promise<TopicDetail | null> {
   const domain = await domainForObjectiveActive(objective);
-  if (!domain) return null;
+  if (!domain) return null; // not a recognized objective for the active cert — the only real 404 case
 
   const db = getDb();
   const certificationId = await getActiveCertificationId();
-  const rows = await db
-    .select()
-    .from(cards)
-    .where(and(eq(cards.userId, userId), eq(cards.certificationId, certificationId), eq(cards.objective, objective)));
-  if (rows.length === 0) return null;
+  const [cardRows, chunkRows] = await Promise.all([
+    db
+      .select()
+      .from(cards)
+      .where(and(eq(cards.userId, userId), eq(cards.certificationId, certificationId), eq(cards.objective, objective))),
+    // Library-linked chunks only (pdfId set) — a chunk with no PDF entry
+    // (e.g. from the CLI's local-file path) has nothing to deep-link to.
+    db
+      .select({
+        pdfId: ingestedChunks.pdfId,
+        filename: pdfLibrary.filename,
+        sectionTitle: ingestedChunks.sectionTitle,
+        startPage: ingestedChunks.startPage,
+        endPage: ingestedChunks.endPage,
+      })
+      .from(ingestedChunks)
+      .innerJoin(pdfLibrary, eq(ingestedChunks.pdfId, pdfLibrary.id))
+      .where(and(eq(ingestedChunks.certificationId, certificationId), eq(ingestedChunks.objective, objective), isNotNull(ingestedChunks.pdfId))),
+  ]);
+  // A topic can be real (a recognized objective) with zero cards so far —
+  // e.g. right after uploading a PDF, before any cards are generated from
+  // it — so this no longer 404s just because cardRows is empty.
 
   const labels = await objectiveLabels();
   const title = labels.get(objective);
@@ -109,10 +135,13 @@ export async function getTopic(userId: string, objective: string): Promise<Topic
   return {
     objective,
     domain,
-    cardCount: rows.length,
+    cardCount: cardRows.length,
     label: title ? `${objective} — ${title}` : objective,
-    cards: rows
+    cards: cardRows
       .filter((r) => r.status === 'active' || r.status === 'pending')
       .map((r) => ({ id: r.id, topic: r.topic, type: r.type, status: r.status, flagged: r.flagged, question: questionText(r) })),
+    pdfReferences: chunkRows
+      .filter((c): c is typeof c & { pdfId: string; startPage: number; endPage: number } => c.pdfId !== null && c.startPage !== null && c.endPage !== null)
+      .map((c) => ({ pdfId: c.pdfId, filename: c.filename, sectionTitle: c.sectionTitle, startPage: c.startPage, endPage: c.endPage })),
   };
 }
