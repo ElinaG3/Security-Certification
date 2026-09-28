@@ -234,16 +234,18 @@ function ActiveSection({
   domains,
   initial,
   initialTotal,
+  initialFlaggedOnly = false,
 }: {
   domains: readonly string[];
   initial: ReviewCard[];
   initialTotal: number;
+  initialFlaggedOnly?: boolean;
 }) {
   const [items, setItems] = useState<ReviewCard[]>(initial);
   const [total, setTotal] = useState(initialTotal);
   const [domain, setDomain] = useState('');
   const [query, setQuery] = useState('');
-  const [flaggedOnly, setFlaggedOnly] = useState(false);
+  const [flaggedOnly, setFlaggedOnly] = useState(initialFlaggedOnly);
   const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -414,11 +416,13 @@ export function ReviewBoard({
   activeInitial,
   activeTotal,
   domains,
+  initialFlaggedOnly = false,
 }: {
   pending: ReviewCard[];
   activeInitial: ReviewCard[];
   activeTotal: number;
   domains: readonly string[];
+  initialFlaggedOnly?: boolean;
 }) {
   return (
     <div>
@@ -429,7 +433,7 @@ export function ReviewBoard({
 
       <section>
         <h2 style={{ fontSize: 18, marginBottom: 12 }}>Active cards — spot-check</h2>
-        <ActiveSection domains={domains} initial={activeInitial} initialTotal={activeTotal} />
+        <ActiveSection domains={domains} initial={activeInitial} initialTotal={activeTotal} initialFlaggedOnly={initialFlaggedOnly} />
       </section>
     </div>
   );

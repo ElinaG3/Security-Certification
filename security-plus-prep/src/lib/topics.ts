@@ -2,6 +2,7 @@ import { and, eq, isNotNull } from 'drizzle-orm';
 import { getDb } from '@/db';
 import { cards, ingestedChunks, pdfLibrary } from '@/db/schema';
 import { getActiveCertificationId, domainForObjectiveActive } from './active-certification';
+import { computeRetrievability, LEARNED_THRESHOLD } from './fsrs';
 import type { MultipleChoiceContent, MultipleSelectContent } from '@/db/question-types';
 
 export interface TopicSummary {
@@ -28,9 +29,17 @@ export interface TopicPdfReference {
   endPage: number;
 }
 
+export interface ReadingSection {
+  sectionTitle: string | null;
+  content: string;
+}
+
 export interface TopicDetail extends TopicSummary {
   cards: TopicCard[];
   pdfReferences: TopicPdfReference[];
+  reading: ReadingSection[];
+  learnedCount: number;
+  totalActiveCount: number;
 }
 
 function questionText(row: typeof cards.$inferSelect): string {
@@ -106,7 +115,7 @@ export async function getTopic(userId: string, objective: string): Promise<Topic
 
   const db = getDb();
   const certificationId = await getActiveCertificationId();
-  const [cardRows, chunkRows] = await Promise.all([
+  const [cardRows, chunkRows, readingRows] = await Promise.all([
     db
       .select()
       .from(cards)
@@ -124,13 +133,35 @@ export async function getTopic(userId: string, objective: string): Promise<Topic
       .from(ingestedChunks)
       .innerJoin(pdfLibrary, eq(ingestedChunks.pdfId, pdfLibrary.id))
       .where(and(eq(ingestedChunks.certificationId, certificationId), eq(ingestedChunks.objective, objective), isNotNull(ingestedChunks.pdfId))),
+    // The "Read" section's source text — every chunk for this objective,
+    // regardless of whether it's Library-linked (a chunk from the CLI's
+    // local-file path still has real content, just no deep-link target).
+    db
+      .select({ sectionTitle: ingestedChunks.sectionTitle, content: ingestedChunks.content, startPage: ingestedChunks.startPage })
+      .from(ingestedChunks)
+      .where(and(eq(ingestedChunks.certificationId, certificationId), eq(ingestedChunks.objective, objective))),
   ]);
+
+  // Ordered by page so the reading flows the way the source document does;
+  // chunks with no page info (nulls) sort last rather than first/random.
+  const reading: ReadingSection[] = readingRows
+    .sort((a, b) => (a.startPage ?? Infinity) - (b.startPage ?? Infinity))
+    .map((r) => ({ sectionTitle: r.sectionTitle, content: r.content }));
   // A topic can be real (a recognized objective) with zero cards so far —
   // e.g. right after uploading a PDF, before any cards are generated from
   // it — so this no longer 404s just because cardRows is empty.
 
   const labels = await objectiveLabels();
   const title = labels.get(objective);
+
+  // Same "learned" definition as the home page's tiles (reviewed at least
+  // once AND current FSRS retrievability >= LEARNED_THRESHOLD), scoped to
+  // this objective's active cards only.
+  const activeCardRows = cardRows.filter((r) => r.status === 'active');
+  const learnedCount = activeCardRows.filter((r) => {
+    const rv = computeRetrievability(r);
+    return rv !== null && rv >= LEARNED_THRESHOLD;
+  }).length;
 
   return {
     objective,
@@ -143,5 +174,8 @@ export async function getTopic(userId: string, objective: string): Promise<Topic
     pdfReferences: chunkRows
       .filter((c): c is typeof c & { pdfId: string; startPage: number; endPage: number } => c.pdfId !== null && c.startPage !== null && c.endPage !== null)
       .map((c) => ({ pdfId: c.pdfId, filename: c.filename, sectionTitle: c.sectionTitle, startPage: c.startPage, endPage: c.endPage })),
+    reading,
+    learnedCount,
+    totalActiveCount: activeCardRows.length,
   };
 }

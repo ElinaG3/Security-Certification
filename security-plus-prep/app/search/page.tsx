@@ -3,7 +3,7 @@ import { SearchBox } from '@/components/SearchBox';
 
 export default function SearchPage() {
   return (
-    <main style={{ maxWidth: 640, margin: '0 auto', padding: '40px 20px' }}>
+    <div style={{ maxWidth: 640, margin: '0 auto' }}>
       <p style={{ marginBottom: 16 }}>
         <Link href="/study">&larr; Back to study</Link>
       </p>
@@ -12,6 +12,6 @@ export default function SearchPage() {
         Semantic search over ingested source material (currently: Professor Messer&apos;s course notes).
       </p>
       <SearchBox />
-    </main>
+    </div>
   );
 }

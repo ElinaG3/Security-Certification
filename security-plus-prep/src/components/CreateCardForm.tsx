@@ -37,10 +37,18 @@ const inputStyle: React.CSSProperties = {
 
 const labelStyle: React.CSSProperties = { display: 'block', fontWeight: 600, marginBottom: 4, fontSize: 14 };
 
-export function CreateCardForm({ domains }: { domains: string[] }) {
+export function CreateCardForm({
+  domains,
+  initialDomain,
+  initialObjective,
+}: {
+  domains: string[];
+  initialDomain?: string;
+  initialObjective?: string;
+}) {
   const [note, setNote] = useState('');
-  const [domain, setDomain] = useState<string>(domains[0] ?? '');
-  const [objective, setObjective] = useState('');
+  const [domain, setDomain] = useState<string>(initialDomain ?? domains[0] ?? '');
+  const [objective, setObjective] = useState(initialObjective ?? '');
   const [type, setType] = useState<'multiple_choice' | 'multiple_select'>('multiple_choice');
   const [requiredCount, setRequiredCount] = useState<2 | 3>(2);
 

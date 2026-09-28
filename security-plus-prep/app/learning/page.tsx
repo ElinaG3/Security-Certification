@@ -6,7 +6,7 @@ import Link from 'next/link';
 // onward; this gets replaced in place, same route.
 export default function LearningPlaceholderPage() {
   return (
-    <main style={{ maxWidth: 640, margin: '0 auto', padding: '40px 20px' }}>
+    <div style={{ maxWidth: 640, margin: '0 auto' }}>
       <p style={{ marginBottom: 16 }}>
         <Link href="/">&larr; Back to dashboard</Link>
       </p>
@@ -15,6 +15,6 @@ export default function LearningPlaceholderPage() {
         Coming soon — a structured session (free recall, typed-answer cards, error log, hands-on practice) for actually
         learning new material, not just reviewing what you already know.
       </p>
-    </main>
+    </div>
   );
 }

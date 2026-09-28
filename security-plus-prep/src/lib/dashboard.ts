@@ -1,7 +1,7 @@
 import { and, eq, isNotNull } from 'drizzle-orm';
 import { getDb } from '@/db';
 import { cards, reviewLog, recallAttempts } from '@/db/schema';
-import { computeRetrievability } from './fsrs';
+import { computeRetrievability, LEARNED_THRESHOLD } from './fsrs';
 import { getActiveCertificationId, getActiveDomains, getActiveDomainWeights, getActiveObjectives } from './active-certification';
 import { objectiveLabels } from './topics';
 
@@ -180,11 +180,19 @@ export interface DomainLearningProgress {
   topics: TopicLearningProgress[];
 }
 
-// "Learned" = reviewed at least once (reps > 0) AND current FSRS
-// retrievability >= 0.8 — the home page's single progress metric, chosen
-// over a plain coverage/retention split so there's one number that
-// actually means "you'd likely remember this today."
-export const LEARNED_THRESHOLD = 0.8;
+// 5-level tile scale for the home page's objective tiles: 0 cards learned
+// (or no cards at all) -> 0 (not started); otherwise bucketed by percent
+// learned. Thresholds per the design spec: 1-24 / 25-49 / 50-79 / 80-100.
+export type TileLevel = 0 | 1 | 2 | 3 | 4;
+
+export function tileLevel(learnedCount: number, totalCount: number): TileLevel {
+  if (totalCount === 0 || learnedCount === 0) return 0;
+  const pct = (learnedCount / totalCount) * 100;
+  if (pct < 25) return 1;
+  if (pct < 50) return 2;
+  if (pct < 80) return 3;
+  return 4;
+}
 
 export async function getLearningProgress(userId: string): Promise<DomainLearningProgress[]> {
   const db = getDb();

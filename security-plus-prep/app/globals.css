@@ -1,11 +1,334 @@
+:root {
+  --font-heading: var(--font-fraunces), Georgia, serif;
+  --font-body: var(--font-plex-sans), system-ui, -apple-system, sans-serif;
+
+  --bg: #f5f4ef;
+  --card-bg: #ffffff;
+  --card-border: #e3e0d8;
+  --card-radius: 16px;
+
+  --text: #1c1e1d;
+  --text-secondary: #5e625f;
+
+  --accent: #1f6f5f;
+  --accent-hover: #174f44;
+  --accent-tint: #e4efeb;
+  --neutral-tint: #f1eee6;
+
+  /* Progress tile scale, level 0 (not started) -> 4 (strong) */
+  --tile-0: #e6e3dc;
+  --tile-1: #d3e8e1;
+  --tile-2: #a3d2c4;
+  --tile-3: #5daa95;
+  --tile-4: #1f6f5f;
+  --tile-text-0: #5e625f;
+  --tile-text-1: #1c1e1d;
+  --tile-text-2: #1c1e1d;
+  --tile-text-3: #10231e;
+  --tile-text-4: #ffffff;
+
+  --topbar-height: 72px;
+  --bottombar-height: 64px;
+}
+
 * {
   box-sizing: border-box;
+}
+
+html,
+body {
   margin: 0;
   padding: 0;
 }
 
 body {
-  font-family: system-ui, -apple-system, sans-serif;
-  background: #f5f7fa;
-  color: #2c3e50;
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  margin: 0;
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: var(--font-body);
+}
+
+input,
+textarea,
+select {
+  font-family: var(--font-body);
+}
+
+/* ---------- Layout shell ---------- */
+
+.app-main {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 32px 24px calc(32px + var(--bottombar-height));
+}
+
+@media (min-width: 769px) {
+  .app-main {
+    padding: 32px 32px;
+  }
+}
+
+/* ---------- Cards ---------- */
+
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--card-radius);
+}
+
+/* ---------- Buttons ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 10px;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.btn:hover {
+  border-color: var(--accent);
+}
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+}
+
+.btn-primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* ---------- Pills ---------- */
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.pill-accent {
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+}
+
+.pill-neutral {
+  background: var(--neutral-tint);
+  color: var(--text-secondary);
+}
+
+.pill-tint {
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+
+/* ---------- Progress bars ---------- */
+
+.bar-track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--tile-0);
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--accent);
+}
+
+/* ---------- Objective tiles ---------- */
+
+.tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  transition: transform 0.1s ease;
+}
+
+.tile:hover {
+  transform: translateY(-1px);
+}
+
+.tile-0 {
+  background: var(--tile-0);
+  color: var(--tile-text-0);
+}
+.tile-1 {
+  background: var(--tile-1);
+  color: var(--tile-text-1);
+}
+.tile-2 {
+  background: var(--tile-2);
+  color: var(--tile-text-2);
+}
+.tile-3 {
+  background: var(--tile-3);
+  color: var(--tile-text-3);
+}
+.tile-4 {
+  background: var(--tile-4);
+  color: var(--tile-text-4);
+}
+
+/* ---------- Breadcrumb ---------- */
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.breadcrumb a:hover {
+  color: var(--accent);
+}
+
+/* ---------- Domain full-name tooltip ---------- */
+
+.domain-label {
+  position: relative;
+}
+
+.domain-label .domain-full-name {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 5;
+  background: var(--text);
+  color: #ffffff;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.domain-label:hover .domain-full-name {
+  display: block;
+}
+
+/* ---------- Dashed placeholder ---------- */
+
+.placeholder-dashed {
+  border: 1.5px dashed var(--card-border);
+  border-radius: var(--card-radius);
+  background: transparent;
+}
+
+/* ---------- Nav ---------- */
+
+.topbar {
+  display: none;
+}
+
+.mobile-header {
+  display: flex;
+}
+
+.bottombar {
+  display: flex;
+}
+
+@media (min-width: 769px) {
+  .topbar {
+    display: flex;
+  }
+  .mobile-header {
+    display: none;
+  }
+  .bottombar {
+    display: none;
+  }
+  .app-main {
+    padding-bottom: 32px;
+  }
+}
+
+.nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 14px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.nav-link:hover {
+  color: var(--accent);
+}
+
+.nav-link.active {
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+
+.bottom-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: var(--bottombar-height);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.bottom-tab.active {
+  color: var(--accent);
 }

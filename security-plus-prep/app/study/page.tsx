@@ -27,9 +27,9 @@ const SUPPORTED_TYPES = [
 export default async function StudyPage({
   searchParams,
 }: {
-  searchParams: Promise<{ domain?: string; mode?: string }>;
+  searchParams: Promise<{ domain?: string; objective?: string; mode?: string }>;
 }) {
-  const { domain, mode } = await searchParams;
+  const { domain, objective, mode } = await searchParams;
   const isWarmup = mode === 'warmup';
   const user = await getCurrentUser();
   const db = getDb();
@@ -40,7 +40,7 @@ export default async function StudyPage({
       .selectDistinct({ domain: cards.domain })
       .from(cards)
       .where(and(eq(cards.userId, user.id), eq(cards.certificationId, certificationId))),
-    isWarmup ? getPbqWarmupQueue({ userId: user.id }) : getDueQueue({ userId: user.id, domain }),
+    isWarmup ? getPbqWarmupQueue({ userId: user.id }) : getDueQueue({ userId: user.id, domain, objective, limit: objective ? 1000 : undefined }),
   ]);
 
   // The Server Component boundary: only sanitized content ever leaves this
@@ -66,7 +66,7 @@ export default async function StudyPage({
     }));
 
   return (
-    <main style={{ maxWidth: 640, margin: '0 auto', padding: '40px 20px' }}>
+    <div style={{ maxWidth: 640, margin: '0 auto' }}>
       <h1>Study</h1>
 
       <nav style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '12px 0 24px' }}>
@@ -94,11 +94,13 @@ export default async function StudyPage({
 
       {publicCards.length === 0 ? (
         <p>
-          {isWarmup ? 'No PBQ cards yet.' : `No cards due right now${domain ? ` in ${domain}` : ''}.`}
+          {isWarmup
+            ? 'No PBQ cards yet.'
+            : `No cards due right now${objective ? ` for objective ${objective}` : domain ? ` in ${domain}` : ''}.`}
         </p>
       ) : (
         <StudySession initialCards={publicCards} />
       )}
-    </main>
+    </div>
   );
 }

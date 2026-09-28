@@ -12,7 +12,7 @@ export default async function LibraryPage() {
   const pdfs = await listPdfs();
 
   return (
-    <main style={{ maxWidth: 720, margin: '0 auto', padding: '40px 20px' }}>
+    <div style={{ maxWidth: 720, margin: '0 auto' }}>
       <p style={{ marginBottom: 16 }}>
         <Link href="/">&larr; Back to dashboard</Link>
       </p>
@@ -44,6 +44,6 @@ export default async function LibraryPage() {
           ))}
         </ul>
       )}
-    </main>
+    </div>
   );
 }

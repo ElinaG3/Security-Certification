@@ -10,11 +10,17 @@ import { getActiveDomains } from '@/lib/active-certification';
 // never reflects new pending cards or edits.
 export const dynamic = 'force-dynamic';
 
-export default async function ReviewPage() {
-  const [pending, active, domains] = await Promise.all([listPendingCards(), listActiveCards({}), getActiveDomains()]);
+export default async function ReviewPage({ searchParams }: { searchParams: Promise<{ flagged?: string }> }) {
+  const { flagged } = await searchParams;
+  const flaggedOnly = flagged === 'true';
+  const [pending, active, domains] = await Promise.all([
+    listPendingCards(),
+    listActiveCards({ flaggedOnly }),
+    getActiveDomains(),
+  ]);
 
   return (
-    <main style={{ maxWidth: 760, margin: '0 auto', padding: '40px 20px' }}>
+    <div style={{ maxWidth: 760, margin: '0 auto' }}>
       <p style={{ marginBottom: 16 }}>
         <Link href="/study">&larr; Back to study</Link>
       </p>
@@ -22,7 +28,7 @@ export default async function ReviewPage() {
       <p style={{ color: '#666', marginBottom: 24 }}>
         Approve/edit/reject cards awaiting review, or spot-check and flag anything already active.
       </p>
-      <ReviewBoard pending={pending} activeInitial={active.cards} activeTotal={active.total} domains={domains} />
-    </main>
+      <ReviewBoard pending={pending} activeInitial={active.cards} activeTotal={active.total} domains={domains} initialFlaggedOnly={flaggedOnly} />
+    </div>
   );
 }

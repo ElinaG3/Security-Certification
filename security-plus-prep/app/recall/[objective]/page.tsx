@@ -14,7 +14,7 @@ export default async function RecallTopicPage({ params }: { params: Promise<{ ob
   if (!topic) notFound();
 
   return (
-    <main style={{ maxWidth: 720, margin: '0 auto', padding: '40px 20px' }}>
+    <div style={{ maxWidth: 720, margin: '0 auto' }}>
       <p style={{ marginBottom: 16 }}>
         <Link href={`/topics/${encodeURIComponent(decoded)}`}>&larr; {topic.label}</Link>
       </p>
@@ -22,6 +22,6 @@ export default async function RecallTopicPage({ params }: { params: Promise<{ ob
       <p style={{ color: '#666', marginBottom: 24 }}>{topic.domain}</p>
 
       <RecallView objective={decoded} topic={topic.label} domain={topic.domain} />
-    </main>
+    </div>
   );
 }

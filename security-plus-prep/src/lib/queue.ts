@@ -9,19 +9,23 @@ type CardRow = typeof cards.$inferSelect;
 
 // Interleaves due cards across domains by default (round-robin over
 // per-domain buckets, each ordered by due date) so a session doesn't run
-// through one domain before touching the next. Pass `domain` for focus mode,
-// which just returns that domain's due cards in due-date order.
+// through one domain before touching the next. Pass `domain` for focus
+// mode, or `objective` for a single-topic focus (e.g. "Practice this
+// topic's cards" from the topic page) — either just returns the filtered
+// due cards in due-date order, same as each other.
 //
 // `limit` defaults to the active certification's own config.sessionSize
 // (not a hardcoded constant) when omitted — same for minMultiSelect below.
 export async function getDueQueue({
   userId,
   domain,
+  objective,
   limit,
   now = new Date(),
 }: {
   userId: string;
   domain?: string;
+  objective?: string;
   limit?: number;
   now?: Date;
 }): Promise<CardRow[]> {
@@ -39,12 +43,13 @@ export async function getDueQueue({
         eq(cards.status, 'active'),
         eq(cards.flagged, false),
         lte(cards.due, now),
-        domain ? eq(cards.domain, domain) : undefined
+        domain ? eq(cards.domain, domain) : undefined,
+        objective ? eq(cards.objective, objective) : undefined
       )
     )
     .orderBy(asc(cards.due));
 
-  if (domain) return due.slice(0, effectiveLimit);
+  if (domain || objective) return due.slice(0, effectiveLimit);
 
   const buckets = new Map<string, CardRow[]>();
   for (const card of due) {

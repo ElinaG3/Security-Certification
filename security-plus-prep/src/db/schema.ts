@@ -326,3 +326,34 @@ export const recallAttempts = pgTable('recall_attempts', {
 
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// Per (user, certification) profile settings — exam date feeds the home
+// page countdown, dailyQuestionCount overrides the certification's own
+// config.sessionSize default when set. Both nullable: "no exam date set"
+// and "use the certification's default question count" are normal,
+// unconfigured states, not missing data. One row per user+cert pair,
+// upserted from src/lib/profile-settings.ts rather than enforced by a DB
+// constraint (this app has exactly one user, so a race here isn't a real
+// risk — same reasoning as users.activeCertificationId's plain update).
+export const userCertificationSettings = pgTable('user_certification_settings', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  certificationId: uuid('certification_id').notNull().references(() => certifications.id),
+  examDate: timestamp('exam_date', { withTimezone: true }),
+  dailyQuestionCount: integer('daily_question_count'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Free-text notes a user keeps per objective/topic (the topic page's "My
+// notes" textarea) — separate from cards/recall/chunks, this is the
+// learner's own writing, never AI-generated or graded. One row per
+// (user, certification, objective).
+export const topicNotes = pgTable('topic_notes', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  certificationId: uuid('certification_id').notNull().references(() => certifications.id),
+  objective: text('objective').notNull(),
+  content: text('content').notNull().default(''),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});

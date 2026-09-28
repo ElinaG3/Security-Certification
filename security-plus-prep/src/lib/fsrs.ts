@@ -22,6 +22,14 @@ const DB_TO_STATE: Record<string, State> = {
 
 type CardRow = typeof cards.$inferSelect;
 
+// "Learned" = reviewed at least once (reps > 0) AND current FSRS
+// retrievability >= this threshold — the single progress metric used on
+// the home page and topic pages, chosen over a plain coverage/retention
+// split so there's one number that actually means "you'd likely remember
+// this today." Lives here (not dashboard.ts) so topics.ts can use it too
+// without a circular import (dashboard.ts already imports from topics.ts).
+export const LEARNED_THRESHOLD = 0.8;
+
 // Retrievability (probability of recall right now) for one card, reusing
 // the SAME scheduler instance/parameters real scheduling uses — not a
 // re-derivation. null for a card that's never been reviewed (reps === 0):

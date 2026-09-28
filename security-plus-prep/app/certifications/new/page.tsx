@@ -3,7 +3,7 @@ import { CreateCertificationForm } from '@/components/CreateCertificationForm';
 
 export default function NewCertificationPage() {
   return (
-    <main style={{ maxWidth: 640, margin: '0 auto', padding: '40px 20px' }}>
+    <div style={{ maxWidth: 640, margin: '0 auto' }}>
       <p style={{ marginBottom: 16 }}>
         <Link href="/">&larr; Back to dashboard</Link>
       </p>
@@ -14,6 +14,6 @@ export default function NewCertificationPage() {
         <code> --certification-id</code>.
       </p>
       <CreateCertificationForm />
-    </main>
+    </div>
   );
 }

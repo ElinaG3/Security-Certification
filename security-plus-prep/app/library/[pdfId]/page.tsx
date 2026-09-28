@@ -23,7 +23,7 @@ export default async function PdfViewerPage({
   const viewerSrc = pageNum && pageNum > 0 ? `${pdf.blobUrl}#page=${pageNum}` : pdf.blobUrl;
 
   return (
-    <main style={{ maxWidth: 1000, margin: '0 auto', padding: '20px 20px 0' }}>
+    <div style={{ maxWidth: 1000, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         <div>
           <p style={{ marginBottom: 4 }}>
@@ -38,6 +38,6 @@ export default async function PdfViewerPage({
         title={pdf.filename}
         style={{ width: '100%', height: 'calc(100vh - 140px)', border: '1px solid #ddd', borderRadius: 8 }}
       />
-    </main>
+    </div>
   );
 }

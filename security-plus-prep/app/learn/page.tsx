@@ -1,29 +1,26 @@
-import Link from 'next/link';
-import { HubCard } from '@/components/HubCard';
+import { FeatureBigCard } from '@/components/home/FeatureBigCard';
+import { BookOpenIcon, BrainIcon, ClockIcon, BookIcon } from '@/components/icons';
 
-const gridStyle: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 };
+const gridStyle: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(240px, 1fr))', gap: 16 };
 
 export default function LearnHubPage() {
   return (
-    <main style={{ maxWidth: 800, margin: '0 auto', padding: '40px 20px' }}>
-      <p style={{ marginBottom: 16 }}>
-        <Link href="/">&larr; Back to home</Link>
-      </p>
-      <h1 style={{ marginBottom: 24 }}>Learning</h1>
+    <div style={{ maxWidth: 900, margin: '0 auto' }}>
+      <h1 style={{ fontSize: 26, marginBottom: 6 }}>Learning</h1>
+      <p style={{ color: 'var(--text-secondary)', marginBottom: 24 }}>Read, take notes, and learn new topics.</p>
+
       <div style={gridStyle}>
-        <HubCard
+        <FeatureBigCard href="/topics" icon={<BookIcon size={22} />} title="Topics" description="Notes, free recall, and cards per objective." />
+        <FeatureBigCard
           href="/learning"
-          title="Guided learning session"
+          icon={<ClockIcon size={22} />}
+          title="Learning routine"
           description="A structured session for new material: recall, typed cards, hands-on practice."
-          comingSoon
+          disabled
         />
-        <HubCard href="/library" title="Library" description="Read your source PDFs in-app, linked to topics." />
-        <HubCard href="/topics" title="Topics" description="Notes, free recall, and cards per topic." />
-        <HubCard href="/recall" title="Free recall" description="Write what you remember, get AI feedback." />
-        <HubCard href="/create" title="Create cards" description="Turn a note into a new card." />
-        <HubCard href="/review" title="Review cards" description="Approve new cards, flag bad ones." />
-        <HubCard href="/search" title="Search" description="Search your notes and source material." />
+        <FeatureBigCard href="/recall" icon={<BrainIcon size={22} />} title="Free recall" description="Write what you remember, get AI feedback." />
+        <FeatureBigCard href="/library" icon={<BookOpenIcon size={22} />} title="Library" description="Read your source PDFs in-app, linked to topics." />
       </div>
-    </main>
+    </div>
   );
 }

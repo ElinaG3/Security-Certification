@@ -19,7 +19,7 @@ export default async function TopicsIndexPage() {
   }
 
   return (
-    <main style={{ maxWidth: 720, margin: '0 auto', padding: '40px 20px' }}>
+    <div style={{ maxWidth: 720, margin: '0 auto' }}>
       <p style={{ marginBottom: 16 }}>
         <Link href="/study">&larr; Back to study</Link>
       </p>
@@ -56,6 +56,6 @@ export default async function TopicsIndexPage() {
           </section>
         );
       })}
-    </main>
+    </div>
   );
 }
