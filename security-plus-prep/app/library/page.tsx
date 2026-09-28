@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { listPdfs } from './actions';
 import { UploadPdfForm } from '@/components/library/UploadPdfForm';
+import { getActiveCertificationId } from '@/lib/active-certification';
 
 // listPdfs reads live, cert-scoped data — no searchParams/cookies to
 // otherwise signal dynamic rendering, so without this Next would
@@ -8,8 +9,14 @@ import { UploadPdfForm } from '@/components/library/UploadPdfForm';
 // fixed on /review, /topics, and the home dashboard).
 export const dynamic = 'force-dynamic';
 
+// Applies to Server Actions invoked from this route too (ingestUploadedPdf,
+// called by UploadPdfForm below) — extraction + local embedding is the
+// slow part for a large PDF, so this gives it real headroom instead of
+// the platform default.
+export const maxDuration = 300;
+
 export default async function LibraryPage() {
-  const pdfs = await listPdfs();
+  const [pdfs, certificationId] = await Promise.all([listPdfs(), getActiveCertificationId()]);
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto' }}>
@@ -22,7 +29,7 @@ export default async function LibraryPage() {
         search, and card generation, but generating cards from it is a separate step.
       </p>
 
-      <UploadPdfForm />
+      <UploadPdfForm certificationId={certificationId} />
 
       {pdfs.length === 0 ? (
         <p style={{ color: '#666' }}>No PDFs uploaded yet.</p>

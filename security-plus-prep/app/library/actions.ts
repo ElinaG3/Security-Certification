@@ -4,8 +4,11 @@ import { eq, and, desc } from 'drizzle-orm';
 import { getDb } from '@/db';
 import { pdfLibrary, ingestedChunks } from '@/db/schema';
 import { getActiveCertificationId } from '@/lib/active-certification';
-import { uploadCertificationPdf } from '@/lib/blob';
 import { extractPdfPages, chunkPdfPages, persistChunks, scoreChunkNovelty } from '@/lib/pdf-ingestion';
+
+// maxDuration for ingestUploadedPdf below lives on app/library/page.tsx,
+// not here — a 'use server' file may only export async functions, so a
+// route-segment-config constant can't live in this file at all.
 
 export interface LibraryPdf {
   id: string;
@@ -50,31 +53,55 @@ export async function getPdf(id: string): Promise<LibraryPdf | null> {
   return { id: row.id, filename: row.filename, blobUrl: row.blobUrl, pageCount: row.pageCount, uploadedAt: row.uploadedAt, chunkCount: chunks.length };
 }
 
-export type UploadPdfResult = { ok: true; id: string; chunkCount: number } | { ok: false; issue: string };
+export type IngestPdfResult =
+  | { ok: true; id: string; pageCount: number; chunkCount: number }
+  | { ok: false; issue: string };
 
-// Upload only chunks + embeds (per the spec) — it does NOT generate cards.
-// Card generation from a chunk stays a separate, explicit step (the
-// existing /review-gated pipeline), same as the CLI ingestion path.
-export async function uploadPdf(file: File): Promise<UploadPdfResult> {
-  if (file.type !== 'application/pdf') return { ok: false, issue: 'Only PDF files are accepted.' };
-
+// The file itself is already in Blob storage by the time this runs — the
+// client uploads directly (src/components/library/UploadPdfForm.tsx via
+// @vercel/blob/client's upload(), through the token endpoint at
+// app/api/library/upload/route.ts) rather than passing the raw bytes
+// through a Server Action body, which is how a ~10MB PDF used to hang
+// forever (Next.js's default Server Action body limit is 1MB — the
+// request never completed, and nothing surfaced an error). This action
+// only ever receives a blob URL + filename, a tiny payload regardless of
+// PDF size.
+//
+// Only chunks + embeds (per the spec) — it does NOT generate cards. Card
+// generation from a chunk stays a separate, explicit step (the existing
+// /review-gated pipeline), same as the CLI ingestion path.
+export async function ingestUploadedPdf({ blobUrl, filename }: { blobUrl: string; filename: string }): Promise<IngestPdfResult> {
   const certificationId = await getActiveCertificationId();
+
+  // The upload token was already scoped to this certification's own path
+  // (see onBeforeGenerateToken in the route handler), but that's enforced
+  // at upload time — re-check here too, since this action is a second,
+  // independent entry point that must not trust a client-supplied URL on
+  // its own for which certification's data it may write into.
+  const expectedPrefix = `/library/${certificationId}/`;
+  if (new URL(blobUrl).pathname.startsWith(expectedPrefix) === false) {
+    return { ok: false, issue: 'This file was not uploaded for the active certification.' };
+  }
+
   const db = getDb();
 
-  const buffer = Buffer.from(await file.arrayBuffer());
+  let buffer: Buffer;
+  try {
+    const res = await fetch(blobUrl);
+    if (!res.ok) return { ok: false, issue: `Could not read the uploaded file (HTTP ${res.status}).` };
+    buffer = Buffer.from(await res.arrayBuffer());
+  } catch {
+    return { ok: false, issue: 'Could not read the uploaded file.' };
+  }
+
   const { pages, pageCount } = await extractPdfPages(buffer);
   if (pageCount === 0) return { ok: false, issue: 'Could not read any pages from this PDF.' };
 
-  const blobUrl = await uploadCertificationPdf(certificationId, file);
-
-  const [pdfRow] = await db
-    .insert(pdfLibrary)
-    .values({ certificationId, filename: file.name, blobUrl, pageCount })
-    .returning();
+  const [pdfRow] = await db.insert(pdfLibrary).values({ certificationId, filename, blobUrl, pageCount }).returning();
 
   const rawChunks = chunkPdfPages(pages);
-  const chunkRows = await persistChunks({ certificationId, pdfId: pdfRow.id, sourceFile: file.name, rawChunks });
+  const chunkRows = await persistChunks({ certificationId, pdfId: pdfRow.id, sourceFile: filename, rawChunks });
   await scoreChunkNovelty(certificationId, chunkRows);
 
-  return { ok: true, id: pdfRow.id, chunkCount: chunkRows.length };
+  return { ok: true, id: pdfRow.id, pageCount, chunkCount: chunkRows.length };
 }
