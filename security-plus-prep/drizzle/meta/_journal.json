@@ -78,6 +78,13 @@
       "when": 1790582395414,
       "tag": "0010_add_certification_id_to_content_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790584088073,
+      "tag": "0011_add_active_certification_to_users",
+      "breakpoints": true
     }
   ]
 }

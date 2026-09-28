@@ -3,19 +3,20 @@ import { eq } from 'drizzle-orm';
 import { getDb } from '@/db';
 import { certifications, objectives as objectivesTable } from '@/db/schema';
 import { SY0_701_CERTIFICATION_ID } from './certifications';
+import { getCurrentUser } from './auth';
 
-// Multi-certification refactor, Stage 2. The single seam Stage 3 (the
-// certification switcher) replaces: right now this always resolves to
-// SY0-701, but every live read path in the app goes through THIS
-// function rather than the old hardcoded src/lib/domains.ts constants —
-// so swapping this one function for real per-session selection later is
-// the only change Stage 3 needs to make here.
+// Multi-certification refactor, Stage 3. This was the seam Stage 2 called
+// out: every live read path in the app already goes through THIS
+// function (not the old hardcoded src/lib/domains.ts constants), so
+// resolving from real user selection instead of a fixed constant is the
+// only change needed here — nothing downstream changes.
 //
 // cache() (React, not a manual memo) dedupes calls within one request/
 // render pass — dashboard, topics, and queue queries all ask for the
 // active certification without each paying for a separate DB round trip.
 export const getActiveCertificationId = cache(async (): Promise<string> => {
-  return SY0_701_CERTIFICATION_ID;
+  const user = await getCurrentUser();
+  return user.activeCertificationId ?? SY0_701_CERTIFICATION_ID;
 });
 
 export interface CertDomain {
@@ -83,4 +84,17 @@ export const getActiveObjectives = cache(async (): Promise<ActiveObjective[]> =>
 export async function domainForObjectiveActive(objectiveNumber: string): Promise<string | null> {
   const objectivesList = await getActiveObjectives();
   return objectivesList.find((o) => o.number === objectiveNumber)?.domain ?? null;
+}
+
+export interface CertificationOption {
+  id: string;
+  name: string;
+  examCode: string;
+}
+
+// For the switcher's dropdown — every certification that exists, not just
+// the active one.
+export async function listCertifications(): Promise<CertificationOption[]> {
+  const db = getDb();
+  return db.select({ id: certifications.id, name: certifications.name, examCode: certifications.examCode }).from(certifications);
 }

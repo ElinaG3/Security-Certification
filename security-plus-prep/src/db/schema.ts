@@ -15,6 +15,13 @@ import { SY0_701_CERTIFICATION_ID } from '../lib/certifications';
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   email: text('email').notNull().unique(),
+
+  // Multi-certification refactor, Stage 3. Null = no selection made yet —
+  // src/lib/active-certification.ts's getActiveCertificationId() falls
+  // back to the fixed SY0-701 id in that case, so this column being unset
+  // is a normal, valid state, not a data-quality gap.
+  activeCertificationId: uuid('active_certification_id').references(() => certifications.id),
+
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

@@ -1,8 +1,9 @@
 import Link from 'next/link';
 import { getCurrentUser } from '@/lib/auth';
 import { getStudyStats, getDomainRetention, getDomainRecallAccuracy, getTopicProgress, WEAK_THRESHOLD } from '@/lib/dashboard';
-import { getActiveDomains } from '@/lib/active-certification';
+import { getActiveDomains, getActiveCertification, listCertifications } from '@/lib/active-certification';
 import { DomainBarChart, type DomainBarDatum } from '@/components/dashboard/DomainBarChart';
+import { CertificationSwitcher } from '@/components/CertificationSwitcher';
 
 // Live progress data on every load — no searchParams/cookies to otherwise
 // signal dynamic rendering, so without this Next would statically
@@ -22,12 +23,14 @@ const statTileStyle: React.CSSProperties = {
 
 export default async function HomePage() {
   const user = await getCurrentUser();
-  const [stats, retention, recallAccuracy, topics, activeDomains] = await Promise.all([
+  const [stats, retention, recallAccuracy, topics, activeDomains, activeCert, allCerts] = await Promise.all([
     getStudyStats(user.id),
     getDomainRetention(user.id),
     getDomainRecallAccuracy(user.id),
     getTopicProgress(user.id),
     getActiveDomains(),
+    getActiveCertification(),
+    listCertifications(),
   ]);
 
   const retentionData: DomainBarDatum[] = retention.map((r) => ({
@@ -52,8 +55,13 @@ export default async function HomePage() {
 
   return (
     <main style={{ maxWidth: 900, margin: '0 auto', padding: '40px 20px' }}>
-      <h1 style={{ marginBottom: 4 }}>Security+ Study</h1>
-      <p style={{ color: '#666', marginBottom: 20 }}>SY0-701</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h1 style={{ marginBottom: 4 }}>{activeCert.name} Study</h1>
+          <p style={{ color: '#666', margin: 0 }}>{activeCert.examCode}</p>
+        </div>
+        <CertificationSwitcher certifications={allCerts} activeCertificationId={activeCert.id} />
+      </div>
 
       <nav style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 32 }}>
         <Link href="/study" style={navLink}>
