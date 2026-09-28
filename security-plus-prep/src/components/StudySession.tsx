@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { submitAnswer, flagCard, type SubmitAnswerResult } from '../../app/study/actions';
+import { submitAnswer, flagCard, overrideFillInAnswer, type SubmitAnswerResult } from '../../app/study/actions';
 import type {
   PublicCard,
   PublicMultipleChoiceContent,
@@ -165,26 +165,36 @@ function FillInCardView({
   locked: boolean;
   result: Extract<SubmitAnswerResult, { kind: 'fill_in' }> | null;
 }) {
+  const background = result ? (result.score >= 1 ? '#d4f4dd' : result.score > 0 ? '#fdf6e3' : '#f8d7da') : '#fff';
+  const fieldStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '10px 12px',
+    border: '1px solid #ccc',
+    borderRadius: 6,
+    font: 'inherit',
+    background,
+  };
+
   return (
     <div>
       <h2>{content.question}</h2>
-      <input
-        type="text"
-        value={selected}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={locked}
-        autoFocus
-        style={{
-          width: '100%',
-          padding: '10px 12px',
-          border: '1px solid #ccc',
-          borderRadius: 6,
-          font: 'inherit',
-          background: result ? (result.correct ? '#d4f4dd' : '#f8d7da') : '#fff',
-        }}
-      />
-      {result && !result.correct && (
+      {content.gradingMode === 'ai' ? (
+        <textarea
+          value={selected}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={locked}
+          autoFocus
+          rows={3}
+          style={{ ...fieldStyle, resize: 'vertical' }}
+        />
+      ) : (
+        <input type="text" value={selected} onChange={(e) => onChange(e.target.value)} disabled={locked} autoFocus style={fieldStyle} />
+      )}
+      {result && result.gradingMode === 'exact' && !result.correct && (
         <p style={{ fontSize: 13, color: '#666', marginTop: 6 }}>Accepted answer: {result.correctAnswer}</p>
+      )}
+      {result && result.gradingMode === 'ai' && result.reason && (
+        <p style={{ fontSize: 13, color: '#666', marginTop: 6 }}>{result.reason}</p>
       )}
     </div>
   );
@@ -203,6 +213,9 @@ export function StudySession({ initialCards }: { initialCards: PublicCard[] }) {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [flaggedIds, setFlaggedIds] = useState<Set<string>>(new Set());
   const [flagging, setFlagging] = useState(false);
+  const [overriding, setOverriding] = useState(false);
+  const [overridden, setOverridden] = useState(false);
+  const [overrideError, setOverrideError] = useState<string | null>(null);
   const revealingRef = useRef(false);
 
   const card = initialCards[index];
@@ -291,6 +304,27 @@ export function StudySession({ initialCards }: { initialCards: PublicCard[] }) {
     setGateStartedAt(null);
     setCanReveal(false);
     setStartedAt(Date.now());
+    setOverridden(false);
+    setOverrideError(null);
+  }
+
+  // "I was right" — the typed answer was marked wrong but was actually
+  // correct. Only offered when result.score === 0 (genuinely wrong, not a
+  // partial-credit explanation grade) on a fill_in card.
+  async function handleOverride() {
+    if (overriding || overridden || !result || result.kind !== 'fill_in') return;
+    setOverriding(true);
+    setOverrideError(null);
+    try {
+      const res = await overrideFillInAnswer({ reviewLogId: result.reviewLogId, userAnswer: selected as string });
+      if (res.ok) {
+        setOverridden(true);
+      } else {
+        setOverrideError(res.issue);
+      }
+    } finally {
+      setOverriding(false);
+    }
   }
 
   return (
@@ -384,6 +418,20 @@ export function StudySession({ initialCards }: { initialCards: PublicCard[] }) {
           {result.kind === 'choice' && <p>{result.explanation}</p>}
           {result.kind === 'choice' && result.mnemonic && (
             <p style={{ fontStyle: 'italic', color: '#555' }}>Mnemonic: {result.mnemonic}</p>
+          )}
+          {result.kind === 'fill_in' && result.score === 0 && (
+            <div style={{ margin: '8px 0' }}>
+              {overridden ? (
+                <p style={{ fontSize: 13, color: '#2e7d32' }}>✓ Marked correct. Your answer was added to this card.</p>
+              ) : (
+                <>
+                  <button type="button" onClick={handleOverride} disabled={overriding} style={{ fontSize: 13 }}>
+                    {overriding ? 'Marking...' : 'I was right'}
+                  </button>
+                  {overrideError && <p style={{ fontSize: 12, color: '#c0392b', marginTop: 4 }}>{overrideError}</p>}
+                </>
+              )}
+            </div>
           )}
           {isLast ? (
             <button onClick={() => setPhase('summary')}>See results</button>
@@ -489,7 +537,8 @@ function FillInResultDetail({
     <>
       <p style={{ fontWeight: 600, marginBottom: 8 }}>{content.question}</p>
       <p>Your answer: {selected || '(no answer)'}</p>
-      {!result.correct && <p>Accepted answer: {result.correctAnswer}</p>}
+      {result.gradingMode === 'exact' && !result.correct && <p>Accepted answer: {result.correctAnswer}</p>}
+      {result.gradingMode === 'ai' && result.reason && <p style={{ color: '#666' }}>{result.reason}</p>}
       <p style={{ color: '#444', marginTop: 8 }}>{result.explanation}</p>
     </>
   );

@@ -43,7 +43,15 @@ export interface DragToCategorizeContent {
 
 export interface FillInContent {
   question: string;
-  acceptedAnswers: string[]; // case-insensitive match
+  // 'exact': acceptedAnswers are the literal correct answer(s) — a term,
+  // acronym, port, protocol name — graded via string-normalize match with
+  // an AI near-miss fallback (src/lib/fill-in-grading.ts).
+  // 'ai': the question asks for a 1-2 sentence explanation; acceptedAnswers
+  // are the KEY POINTS the answer should cover, not literal strings to
+  // match — graded by src/lib/fill-in-explanation-grading.ts as
+  // correct/partial/wrong with a one-line reason.
+  gradingMode: 'exact' | 'ai';
+  acceptedAnswers: string[]; // case-insensitive match ('exact'); key points to cover ('ai')
   explanation: string;
 }
 

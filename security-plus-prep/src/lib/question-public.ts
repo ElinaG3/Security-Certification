@@ -59,6 +59,10 @@ export interface PublicRemediationSelectContent {
 
 export interface PublicFillInContent {
   question: string;
+  // Carries no correctness signal (same reasoning as optionOrder above) —
+  // just tells the client whether to render a single-line term input or a
+  // longer explanation textarea.
+  gradingMode: 'exact' | 'ai';
 }
 
 export type PublicQuestionContent =
@@ -105,7 +109,7 @@ export function toPublicContent(
 ): PublicQuestionContent {
   if (type === 'fill_in') {
     const c = content as FillInContent;
-    return { question: c.question };
+    return { question: c.question, gradingMode: c.gradingMode };
   }
   if (type === 'multiple_select') {
     const c = content as MultipleSelectContent;

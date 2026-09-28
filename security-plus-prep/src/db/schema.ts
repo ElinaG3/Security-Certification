@@ -184,6 +184,34 @@ export const reviewLog = pgTable('review_log', {
   // src/lib/pbq-grading.ts.
   subResults: jsonb('sub_results'),
 
+  // Full FSRS-relevant card state as it was immediately BEFORE this review
+  // was applied (state/due/stability/difficulty/elapsedDays/scheduledDays/
+  // learningSteps/reps/lapses/lastReview) — NOT the same as the fields
+  // above, which are ts-fsrs's own post-`next()` log shape and omit
+  // reps/lapses entirely. Only this full snapshot lets a grading override
+  // (see gradingOverrides below) correctly re-run scheduling "as if this
+  // rep had been graded correctly" from the real prior state, rather than
+  // from an already-downgraded one. Null for every review logged before
+  // override support existed, and for review types override doesn't apply
+  // to — populated only on typed-answer (fill_in) reviews.
+  preReviewSnapshot: jsonb('pre_review_snapshot'),
+
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Audit trail for the study-session "I was right" override on typed-answer
+// (fill_in) grading: one row per correction, so a wrong-then-corrected
+// grading is always visible in history rather than silently rewritten.
+// The reviewLog row it corrects is never mutated (reviewLog is append-only
+// — see its own comment above); the correction is a SEPARATE reviewLog
+// row this override inserts, referenced here for the audit trail.
+export const gradingOverrides = pgTable('grading_overrides', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  reviewLogId: uuid('review_log_id').notNull().references(() => reviewLog.id), // the original WRONG-graded review being corrected
+  correctionLogId: uuid('correction_log_id').references(() => reviewLog.id), // the new reviewLog row inserted for the corrected rep; null when the original rep wasn't due (nothing to reschedule)
+  cardId: uuid('card_id').notNull().references(() => cards.id),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  submittedAnswer: text('submitted_answer').notNull(), // what the user actually typed — added to the card's acceptedAnswers for exact-mode cards
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
