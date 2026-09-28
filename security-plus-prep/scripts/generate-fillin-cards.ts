@@ -108,6 +108,7 @@ function buildExplanationSampleSlots(objectives: CliObjective[]): Slot[] {
 
 const GeneratedCardSchema = z.object({
   objective: z.string(),
+  gradingMode: z.enum(['exact', 'ai']),
   topic: z.string(),
   question: z.string(),
   acceptedAnswers: z.array(z.string()).min(1),
@@ -129,6 +130,7 @@ function submitCardsTool(cert: CliCertification): Anthropic.Tool {
             type: 'object',
             properties: {
               objective: { type: 'string', description: 'The exact objective number this card was written for, copied from the spec' },
+              gradingMode: { type: 'string', enum: ['exact', 'ai'], description: 'Copy from the spec: "exact" for a TERM-mode spec, "ai" for an EXPLANATION-mode spec.' },
               topic: { type: 'string', description: 'Short topic label, 2-5 words' },
               question: { type: 'string' },
               acceptedAnswers: {
@@ -139,7 +141,7 @@ function submitCardsTool(cert: CliCertification): Anthropic.Tool {
               },
               explanation: { type: 'string', description: 'Why this is the answer — 1-2 sentences' },
             },
-            required: ['objective', 'topic', 'question', 'acceptedAnswers', 'explanation'],
+            required: ['objective', 'gradingMode', 'topic', 'question', 'acceptedAnswers', 'explanation'],
           },
         },
       },
@@ -165,7 +167,7 @@ TERM mode (short-answer): the test-taker types a single short fact — a term, a
 - Never write a TERM question whose answer is a yes/no, an open-ended range, or a subjective judgment call — the answer must be one specific, checkable fact.
 - acceptedAnswers for TERM mode: every natural way someone would correctly answer that same fact — an acronym AND its own full expansion when both are natural ("MFA" / "multi-factor authentication"), or a plain number ("443"). TRUE EQUIVALENTS ONLY: every listed answer must mean the exact same thing as every other listed answer for this question — never a different-but-related concept, even a common colloquial one (e.g. for a question about the switch feature that restricts a port to specific MAC addresses, the answer is "port security" — do NOT also list "MAC filtering", which is a different, broader concept, not this feature's name). Do not add redundant case variants — matching is already case-insensitive. Every listed answer must be unambiguously correct standing alone.
 
-EXPLANATION mode (short free-text): the test-taker writes 1-2 sentences. The question MUST literally ask them to explain — start it with "Explain..." or "Why..." or "How..." (e.g. "Explain why rotating encryption keys periodically reduces the impact of a key compromise.").
+EXPLANATION mode (short free-text): the test-taker writes 1-2 sentences. The question MUST contain an explicit "Explain...", "Why...", or "How..." instruction somewhere in it — either as the whole question ("Explain why rotating encryption keys periodically reduces the impact of a key compromise.") or after a short scenario lead-in ("...before resigning. Explain what type of threat actor this represents.").
 - Ask about a genuine mechanism, reason, or tradeoff within the objective — not something answerable with a single word (that belongs in TERM mode instead).
 - acceptedAnswers for EXPLANATION mode: 2-4 short key-point phrases (not full sentences) a correct answer needs to touch on — these are grading criteria for an AI judge, not literal strings to match verbatim.
 
@@ -173,6 +175,7 @@ BOTH modes:
 - Every question must be answerable from the given objective's own subject matter — stay strictly within scope of the objective listed, don't drift into a different objective's territory.
 
 objective: copy the objective number from the spec EXACTLY as given.
+gradingMode: "exact" for a TERM-mode spec, "ai" for an EXPLANATION-mode spec — copy the spec's own mode, don't decide independently.
 topic: a short 2-5 word label for this specific question's subtopic.
 explanation: 1-2 sentences — for TERM mode, why that's the answer; for EXPLANATION mode, a full model answer (also shown to the learner and given to the AI grader as reference).
 
@@ -203,14 +206,35 @@ function chunk<T>(arr: T[], size: number): T[][] {
   return out;
 }
 
-function printCard(card: GeneratedCard, domain: string, gradingMode: GradingMode, issues: string[]) {
-  console.log(`\n--- [${domain}] ${card.topic} (obj ${card.objective}, ${gradingMode})`);
+function printCard(card: GeneratedCard, domain: string, issues: string[]) {
+  console.log(`\n--- [${domain}] ${card.topic} (obj ${card.objective}, ${card.gradingMode})`);
   console.log(`Q: ${card.question}`);
-  console.log(`${gradingMode === 'exact' ? 'Accepted' : 'Key points'}: ${card.acceptedAnswers.map((a) => `"${a}"`).join(', ')}`);
+  console.log(`${card.gradingMode === 'exact' ? 'Accepted' : 'Key points'}: ${card.acceptedAnswers.map((a) => `"${a}"`).join(', ')}`);
   console.log(`Explanation: ${card.explanation}`);
   if (issues.length > 0) {
     console.log(`STRUCTURAL ISSUES: ${issues.join('; ')}`);
   }
+}
+
+// Defense in depth against exactly the bug this script shipped with once
+// already: trusting a slot-vs-generated-card match that silently mislabeled
+// most 'ai' cards as 'exact' whenever an objective's slots landed in the
+// same batch. Now every card self-reports its own gradingMode (see the
+// tool schema), but this still double-checks that self-report against the
+// question's own phrasing. EXPLANATION-mode questions reliably contain an
+// explain/why/how clause SOMEWHERE (often after a scenario lead-in, e.g.
+// "...before resigning. Explain what type of threat actor this
+// represents." — not anchored to the start, real generated content
+// doesn't put it there) — so this checks for presence, not position.
+function modeMismatchIssues(card: GeneratedCard): string[] {
+  const hasExplainClause = /\b(explain|why|how)\b/i.test(card.question);
+  if (card.gradingMode === 'exact' && hasExplainClause) {
+    return ['gradingMode is "exact" but the question contains an explain/why/how clause — likely mislabeled'];
+  }
+  if (card.gradingMode === 'ai' && !hasExplainClause) {
+    return ['gradingMode is "ai" but the question has no explain/why/how clause — likely mislabeled'];
+  }
+  return [];
 }
 
 async function main() {
@@ -241,20 +265,49 @@ async function main() {
   const batches = chunk(slots, BATCH_SIZE);
   let activeCount = 0;
   let pendingCount = 0;
+  // Guards against a real failure mode this batch actually hit: a batch
+  // occasionally returns one extra card beyond what was asked for, and
+  // that extra was a near-duplicate of another card in the same batch
+  // (same scenario, contradictory/wrong terminology). Tracked across the
+  // whole run, normalized, so an exact repeat gets held for review instead
+  // of silently landing 'active' twice.
+  const seenQuestions = new Set<string>();
+  function normalizeQuestion(q: string): string {
+    return q.trim().toLowerCase().replace(/\s+/g, ' ');
+  }
 
   for (const [i, batch] of batches.entries()) {
     console.log(`Batch ${i + 1}/${batches.length} (${batch.length} cards)...`);
     const generated = await generateBatch(batch, cert);
+    if (generated.length !== batch.length) {
+      console.log(`  NOTE: batch asked for ${batch.length} card(s), got ${generated.length} back.`);
+    }
 
     for (const card of generated) {
-      const slot = batch.find((s) => s.objective.number === card.objective);
-      const gradingMode: GradingMode = slot?.gradingMode ?? 'exact';
-      const domain = domainByObjective.get(card.objective) ?? slot?.objective.domain ?? 'Unknown';
-      const content: FillInContent = { question: card.question, gradingMode, acceptedAnswers: card.acceptedAnswers, explanation: card.explanation };
-      const issues = checkFillInConsistency(content);
+      // Domain comes from the certification's own objective map — never
+      // from slot matching, so it's unaffected by the bug below.
+      const domain = domainByObjective.get(card.objective) ?? 'Unknown';
+      // authoredDifficulty is cosmetic metadata (unlike gradingMode, it
+      // doesn't change how grading behaves), so it's fine to derive
+      // directly from the card's own self-reported mode rather than a
+      // slot lookup: 'ai' cards are always 'application' difficulty by
+      // design; 'exact' cards default to 'recall'.
+      const authoredDifficulty: Difficulty = card.gradingMode === 'ai' ? 'application' : 'recall';
+      const content: FillInContent = {
+        question: card.question,
+        gradingMode: card.gradingMode,
+        acceptedAnswers: card.acceptedAnswers,
+        explanation: card.explanation,
+      };
+      const normalizedQuestion = normalizeQuestion(card.question);
+      const isDuplicate = seenQuestions.has(normalizedQuestion);
+      seenQuestions.add(normalizedQuestion);
+
+      const issues = [...checkFillInConsistency(content), ...modeMismatchIssues(card)];
+      if (isDuplicate) issues.push('duplicate question text within this run');
 
       if (isSample) {
-        printCard(card, domain, gradingMode, issues);
+        printCard(card, domain, issues);
         continue;
       }
 
@@ -272,7 +325,7 @@ async function main() {
         content,
         status,
         sourceType: 'generated',
-        authoredDifficulty: slot?.difficulty ?? null,
+        authoredDifficulty,
         objective: card.objective,
       });
       if (status === 'active') {
