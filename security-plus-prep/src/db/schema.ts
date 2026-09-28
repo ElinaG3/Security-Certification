@@ -171,3 +171,47 @@ export const ingestedChunks = pgTable('ingested_chunks', {
 
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// Free-recall attempts (Phase 6). Append-only — never updated or
+// overwritten, one row per attempt, same convention as reviewLog — so
+// recall accuracy over time on a topic is visible from real history, not
+// a single mutable "latest score." Deliberately a SEPARATE signal from
+// FSRS card retention (cards.stability/difficulty/reps): recognition
+// (multiple-choice) and production (free recall) are different skills,
+// and this table is never read by src/lib/fsrs.ts or blended into a
+// card's schedule.
+export const recallAttempts = pgTable('recall_attempts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id),
+
+  // Nullable: a recall session can be started generically (all topics) as
+  // well as scoped to one SY0-701 objective.
+  objective: text('objective'),
+  topic: text('topic').notNull(),
+
+  // 'typed' (direct text entry) | 'handwritten' (image OCR'd, transcription
+  // confirmed by the user, then graded like typed) | 'drawing_only' (just a
+  // diagram, no text recall attempted — no grading, comments only).
+  inputMode: text('input_mode').notNull(),
+
+  rawText: text('raw_text'), // typed mode: what the user actually typed
+  imageUrl: text('image_url'), // handwritten mode: the image OCR ran on
+  transcription: text('transcription'), // handwritten mode: raw OCR output, before edits
+  confirmedTranscription: text('confirmed_transcription'), // handwritten mode: what the user approved for grading
+
+  // {correct: string[], missed: string[], errors: string[]} — null for
+  // drawing_only (nothing was graded). score = correct.length /
+  // (correct.length + missed.length), stored alongside so it doesn't need
+  // recomputing from the JSON on every read.
+  gapReport: jsonb('gap_report'),
+  score: real('score'),
+
+  // Independent of the above — a drawing (canvas or uploaded) never
+  // produces a score, only qualitative vision comments. Can coexist with
+  // any inputMode (e.g. typed recall + a supporting diagram) or be the
+  // entire attempt (drawing_only).
+  drawingUrl: text('drawing_url'),
+  drawingComments: text('drawing_comments'),
+
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});

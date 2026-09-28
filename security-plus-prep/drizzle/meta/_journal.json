@@ -57,6 +57,13 @@
       "when": 1790530629412,
       "tag": "0007_add_card_flag",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790579106337,
+      "tag": "0008_add_recall_attempts",
+      "breakpoints": true
     }
   ]
 }

@@ -2,13 +2,15 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getCurrentUser } from '@/lib/auth';
 import { getTopic } from '@/lib/topics';
+import { listRecallAttempts } from '../../recall/actions';
 
 export const dynamic = 'force-dynamic';
 
 export default async function TopicDetailPage({ params }: { params: Promise<{ objective: string }> }) {
   const { objective } = await params;
   const user = await getCurrentUser();
-  const topic = await getTopic(user.id, decodeURIComponent(objective));
+  const decoded = decodeURIComponent(objective);
+  const [topic, recallAttempts] = await Promise.all([getTopic(user.id, decoded), listRecallAttempts(decoded)]);
   if (!topic) notFound();
 
   return (
@@ -50,8 +52,35 @@ export default async function TopicDetailPage({ params }: { params: Promise<{ ob
       </section>
 
       <section>
-        <h2 style={{ fontSize: 16, marginBottom: 10 }}>Notes &amp; drawings</h2>
-        <p style={{ color: '#666' }}>Coming with Recall mode.</p>
+        <h2 style={{ fontSize: 16, marginBottom: 10 }}>Recall attempts ({recallAttempts.length})</h2>
+        <p style={{ marginBottom: 12 }}>
+          <Link href={`/recall/${encodeURIComponent(decoded)}`}>Start a recall attempt &rarr;</Link>
+        </p>
+        {recallAttempts.length === 0 ? (
+          <p style={{ color: '#666' }}>No attempts yet.</p>
+        ) : (
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+            {recallAttempts.map((a) => (
+              <li key={a.id} style={{ border: '1px solid #eee', borderRadius: 6, padding: '10px 12px', marginBottom: 8 }}>
+                <p style={{ fontSize: 12, color: '#999', marginBottom: 4 }}>
+                  {new Date(a.createdAt).toLocaleString()} · {a.inputMode}
+                  {a.score !== null && ` · ${Math.round(a.score * 100)}%`}
+                </p>
+                {a.gapReport && (
+                  <p style={{ margin: 0, fontSize: 13 }}>
+                    {a.gapReport.correct.length} recalled, {a.gapReport.missed.length} missed
+                    {a.gapReport.errors.length > 0 && `, ${a.gapReport.errors.length} error(s)`}
+                  </p>
+                )}
+                {a.drawingUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={a.drawingUrl} alt="drawing" style={{ maxWidth: 160, marginTop: 6, borderRadius: 4, border: '1px solid #ddd' }} />
+                )}
+                {a.drawingComments && <p style={{ fontSize: 12, color: '#666', marginTop: 4 }}>{a.drawingComments}</p>}
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
     </main>
   );
