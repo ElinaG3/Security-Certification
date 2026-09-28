@@ -164,6 +164,86 @@ export async function getDomainRecallAccuracy(userId: string): Promise<DomainRec
   });
 }
 
+export interface TopicLearningProgress {
+  objective: string;
+  domain: string;
+  label: string;
+  learnedCount: number;
+  totalCount: number;
+}
+
+export interface DomainLearningProgress {
+  domain: string;
+  targetWeight: number;
+  learnedCount: number;
+  totalCount: number;
+  topics: TopicLearningProgress[];
+}
+
+// "Learned" = reviewed at least once (reps > 0) AND current FSRS
+// retrievability >= 0.8 — the home page's single progress metric, chosen
+// over a plain coverage/retention split so there's one number that
+// actually means "you'd likely remember this today."
+export const LEARNED_THRESHOLD = 0.8;
+
+export async function getLearningProgress(userId: string): Promise<DomainLearningProgress[]> {
+  const db = getDb();
+  const [certificationId, domains, weights, objectivesList] = await Promise.all([
+    getActiveCertificationId(),
+    getActiveDomains(),
+    getActiveDomainWeights(),
+    getActiveObjectives(),
+  ]);
+  const domainByObjective = new Map(objectivesList.map((o) => [o.number, o.domain]));
+
+  const rows = await db
+    .select()
+    .from(cards)
+    .where(and(eq(cards.userId, userId), eq(cards.certificationId, certificationId), eq(cards.status, 'active')));
+
+  const labels = await objectiveLabels();
+
+  type DomainBucket = { learned: number; total: number; topics: Map<string, { learned: number; total: number }> };
+  const byDomain = new Map<string, DomainBucket>();
+  for (const domain of domains) byDomain.set(domain, { learned: 0, total: 0, topics: new Map() });
+
+  for (const row of rows) {
+    const bucket = byDomain.get(row.domain);
+    if (!bucket) continue; // a domain string outside the active cert's own list — skip rather than guess
+    const r = computeRetrievability(row);
+    const learned = r !== null && r >= LEARNED_THRESHOLD;
+    bucket.total++;
+    if (learned) bucket.learned++;
+
+    if (!row.objective) continue;
+    // Tally into the topic breakdown only when the objective's official
+    // domain agrees with the card's own — keeps the expanded topic list
+    // from double-counting a card under the wrong domain.
+    if (domainByObjective.get(row.objective) !== row.domain) continue;
+    if (!bucket.topics.has(row.objective)) bucket.topics.set(row.objective, { learned: 0, total: 0 });
+    const t = bucket.topics.get(row.objective)!;
+    t.total++;
+    if (learned) t.learned++;
+  }
+
+  return domains.map((domain) => {
+    const b = byDomain.get(domain)!;
+    const topics: TopicLearningProgress[] = [...b.topics.entries()]
+      .map(([objective, t]) => {
+        const title = labels.get(objective);
+        return {
+          objective,
+          domain,
+          label: title ? `${objective} — ${title}` : objective,
+          learnedCount: t.learned,
+          totalCount: t.total,
+        };
+      })
+      .sort((a, c) => a.objective.localeCompare(c.objective, undefined, { numeric: true }));
+    return { domain, targetWeight: weights[domain], learnedCount: b.learned, totalCount: b.total, topics };
+  });
+}
+
 export interface TopicProgress {
   objective: string;
   domain: string;
