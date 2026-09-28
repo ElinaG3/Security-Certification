@@ -16,6 +16,12 @@ export interface StudyStats {
   totalActiveCards: number;
   currentStreak: number;
   studyDays: number;
+  // Flat average of computeRetrievability() across every studied
+  // (reps > 0) card, regardless of domain — "if you sat down right now,
+  // about how much of what you've studied would you likely still get
+  // right." null when nothing's been studied yet (never faked as 0 or
+  // 100). This is the plain-language summary line's second number.
+  overallRetention: number | null;
 }
 
 export async function getStudyStats(userId: string): Promise<StudyStats> {
@@ -23,7 +29,7 @@ export async function getStudyStats(userId: string): Promise<StudyStats> {
   const certificationId = await getActiveCertificationId();
   const [activeCards, reviewDates] = await Promise.all([
     db
-      .select({ reps: cards.reps })
+      .select()
       .from(cards)
       .where(and(eq(cards.userId, userId), eq(cards.certificationId, certificationId), eq(cards.status, 'active'))),
     // review_log has no certification_id of its own — it inherits scope via
@@ -35,7 +41,19 @@ export async function getStudyStats(userId: string): Promise<StudyStats> {
       .where(and(eq(reviewLog.userId, userId), eq(cards.certificationId, certificationId))),
   ]);
 
-  const cardsStudied = activeCards.filter((c) => c.reps > 0).length;
+  const studiedCards = activeCards.filter((c) => c.reps > 0);
+  const cardsStudied = studiedCards.length;
+
+  let retentionSum = 0;
+  let retentionCount = 0;
+  for (const card of studiedCards) {
+    const r = computeRetrievability(card);
+    if (r !== null) {
+      retentionSum += r;
+      retentionCount++;
+    }
+  }
+  const overallRetention = retentionCount > 0 ? retentionSum / retentionCount : null;
 
   // Distinct calendar dates (UTC) with at least one review — good enough
   // for a personal single-user app; not attempting per-user timezone
@@ -58,7 +76,7 @@ export async function getStudyStats(userId: string): Promise<StudyStats> {
     }
   }
 
-  return { cardsStudied, totalActiveCards: activeCards.length, currentStreak, studyDays };
+  return { cardsStudied, totalActiveCards: activeCards.length, currentStreak, studyDays, overallRetention };
 }
 
 export interface DomainRetention {

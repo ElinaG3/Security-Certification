@@ -27,8 +27,10 @@ export function CertificationSwitcher({
     startTransition(() => router.refresh());
   }
 
-  if (certifications.length <= 1) return null; // nothing to switch between yet
-
+  // Always visible, even with only one certification — this is the
+  // header's permanent "which cert am I looking at" control, not just a
+  // multi-cert affordance. A single-option select is still meaningful
+  // (confirms what's active) and is ready the instant a second cert exists.
   return (
     <select
       value={value}
