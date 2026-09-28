@@ -9,6 +9,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { AI_MODELS } from './ai-models';
 import { shuffleChoiceContent } from './option-order';
+import { getActiveCertification } from './active-certification';
 
 const client = new Anthropic();
 
@@ -25,9 +26,10 @@ export const GeneratedCardDraftSchema = z.object({
 });
 export type GeneratedCardDraft = z.infer<typeof GeneratedCardDraftSchema>;
 
-const submitCardTool: Anthropic.Tool = {
+function submitCardTool(examName: string, examCode: string): Anthropic.Tool {
+  return {
   name: 'submit_card',
-  description: 'Submit one generated CompTIA Security+ (SY0-701) practice question.',
+  description: `Submit one generated ${examName} (${examCode}) practice question.`,
   input_schema: {
     type: 'object',
     properties: {
@@ -50,7 +52,8 @@ const submitCardTool: Anthropic.Tool = {
     },
     required: ['type', 'topic', 'authoredDifficulty', 'question', 'options', 'correct', 'explanation', 'distractorExplanations'],
   },
-};
+  };
+}
 
 export interface DraftRequest {
   note: string;
@@ -60,23 +63,23 @@ export interface DraftRequest {
   requiredCount?: number; // multiple_select only
 }
 
-function buildPrompt(req: DraftRequest): string {
+function buildPrompt(req: DraftRequest, examName: string, examCode: string): string {
   const typeLine =
     req.type === 'multiple_select'
       ? `type: multiple_select, requiredCount: ${req.requiredCount ?? 2}`
       : `type: multiple_choice`;
 
-  return `Write one original CompTIA Security+ (SY0-701) practice question from the note below. Test the concept in the note — do NOT copy its wording or format into the question; turn it into a fresh scenario.
+  return `Write one original ${examName} (${examCode}) practice question from the note below. Test the concept in the note — do NOT copy its wording or format into the question; turn it into a fresh scenario.
 
-domain: "${req.domain}"${req.objective ? `\nSY0-701 objective: ${req.objective}` : ''}
+domain: "${req.domain}"${req.objective ? `\n${examCode} objective: ${req.objective}` : ''}
 ${typeLine}
 
 Note (source material — context only):
 """${req.note}"""
 
 STYLE — scenario-based, exam-realistic:
-- 2-4 sentences of realistic organizational scenario (a company, a role, a constraint, an incident in progress), then a question ending in a natural CompTIA qualifier (BEST / MOST likely / FIRST / MOST cost-effective / GREATEST risk — pick whichever fits the concept).
-- Candidate feedback on the real SY0-701 exam consistently says the hard part isn't obscure facts — it's that multiple options all look correct, and you must pick the BEST one by CompTIA's logic. Recreate that difficulty.
+- 2-4 sentences of realistic organizational scenario (a company, a role, a constraint, an incident in progress), then a question ending in a natural qualifier (BEST / MOST likely / FIRST / MOST cost-effective / GREATEST risk — pick whichever fits the concept).
+- Candidate feedback on the real ${examCode} exam consistently says the hard part isn't obscure facts — it's that multiple options all look correct, and you must pick the BEST one by the exam's own logic. Recreate that difficulty.
 
 EVERY QUESTION has EXACTLY 4 options TOTAL. Never 5, never 6. options.length === 4 always. For multiple_select with requiredCount 2, that means exactly 2 correct + 2 incorrect = 4 total.
 
@@ -101,12 +104,13 @@ Call submit_card with the completed question.`;
 }
 
 export async function generateCardDraft(req: DraftRequest): Promise<GeneratedCardDraft> {
+  const cert = await getActiveCertification();
   const response = await client.messages.create({
     model: AI_MODELS.content,
     max_tokens: 4096,
-    tools: [submitCardTool],
+    tools: [submitCardTool(cert.name, cert.examCode)],
     tool_choice: { type: 'tool', name: 'submit_card' },
-    messages: [{ role: 'user', content: buildPrompt(req) }],
+    messages: [{ role: 'user', content: buildPrompt(req, cert.name, cert.examCode) }],
   });
 
   const toolUse = response.content.find((block): block is Anthropic.ToolUseBlock => block.type === 'tool_use');

@@ -1,7 +1,7 @@
 import { and, eq, isNotNull } from 'drizzle-orm';
 import { getDb } from '@/db';
 import { cards, ingestedChunks } from '@/db/schema';
-import { domainForObjective } from './domains';
+import { getActiveCertificationId, domainForObjectiveActive } from './active-certification';
 import type { MultipleChoiceContent, MultipleSelectContent } from '@/db/question-types';
 
 export interface TopicSummary {
@@ -31,17 +31,19 @@ function questionText(row: typeof cards.$inferSelect): string {
   return '';
 }
 
-// Best-available heading label per objective — real CompTIA wording isn't
-// available yet (no official SY0-701 objectives PDF ingested), so this
-// falls back to whatever section titles ingestedChunks happened to collect
-// for that objective (from Messer's notes). Some objectives will have none
-// (no source chunks yet) and show just the bare number.
+// Best-available heading label per objective — real official exam wording
+// isn't available yet for every certification, so this falls back to
+// whatever section titles ingestedChunks happened to collect for that
+// objective from source material. Some objectives will have none (no
+// source chunks yet) and show just the bare number. Scoped to the active
+// certification, same as everything else here.
 export async function objectiveLabels(): Promise<Map<string, string>> {
   const db = getDb();
+  const certificationId = await getActiveCertificationId();
   const chunks = await db
     .select({ objective: ingestedChunks.objective, sectionTitle: ingestedChunks.sectionTitle })
     .from(ingestedChunks)
-    .where(isNotNull(ingestedChunks.objective));
+    .where(and(eq(ingestedChunks.certificationId, certificationId), isNotNull(ingestedChunks.objective)));
 
   const byObjective = new Map<string, Set<string>>();
   for (const c of chunks) {
@@ -60,10 +62,11 @@ export async function objectiveLabels(): Promise<Map<string, string>> {
 
 export async function listTopics(userId: string): Promise<{ topics: TopicSummary[]; orphanCount: number }> {
   const db = getDb();
+  const certificationId = await getActiveCertificationId();
   const rows = await db
     .select({ objective: cards.objective })
     .from(cards)
-    .where(and(eq(cards.userId, userId), eq(cards.status, 'active')));
+    .where(and(eq(cards.userId, userId), eq(cards.certificationId, certificationId), eq(cards.status, 'active')));
 
   const counts = new Map<string, number>();
   let orphanCount = 0;
@@ -78,8 +81,8 @@ export async function listTopics(userId: string): Promise<{ topics: TopicSummary
   const labels = await objectiveLabels();
   const topics: TopicSummary[] = [];
   for (const [objective, cardCount] of counts) {
-    const domain = domainForObjective(objective);
-    if (!domain) continue; // unrecognized prefix — shouldn't happen, skip rather than guess
+    const domain = await domainForObjectiveActive(objective);
+    if (!domain) continue; // not a recognized objective for the active cert — skip rather than guess
     const title = labels.get(objective);
     topics.push({ objective, domain, cardCount, label: title ? `${objective} — ${title}` : objective });
   }
@@ -89,14 +92,15 @@ export async function listTopics(userId: string): Promise<{ topics: TopicSummary
 }
 
 export async function getTopic(userId: string, objective: string): Promise<TopicDetail | null> {
-  const domain = domainForObjective(objective);
+  const domain = await domainForObjectiveActive(objective);
   if (!domain) return null;
 
   const db = getDb();
+  const certificationId = await getActiveCertificationId();
   const rows = await db
     .select()
     .from(cards)
-    .where(and(eq(cards.userId, userId), eq(cards.objective, objective)));
+    .where(and(eq(cards.userId, userId), eq(cards.certificationId, certificationId), eq(cards.objective, objective)));
   if (rows.length === 0) return null;
 
   const labels = await objectiveLabels();

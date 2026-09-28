@@ -1,7 +1,8 @@
-import { isNotNull } from 'drizzle-orm';
+import { and, isNotNull, eq } from 'drizzle-orm';
 import { getDb } from '@/db';
 import { ingestedChunks } from '@/db/schema';
 import { embedText, cosineSimilarity } from './embeddings';
+import { getActiveCertificationId } from './active-certification';
 
 export interface ChunkSearchResult {
   id: string;
@@ -24,9 +25,13 @@ export async function searchChunks(query: string, limit = DEFAULT_LIMIT): Promis
   if (trimmed === '') return [];
 
   const db = getDb();
+  const certificationId = await getActiveCertificationId();
   const [queryEmbedding, chunks] = await Promise.all([
     embedText(trimmed),
-    db.select().from(ingestedChunks).where(isNotNull(ingestedChunks.embedding)),
+    db
+      .select()
+      .from(ingestedChunks)
+      .where(and(eq(ingestedChunks.certificationId, certificationId), isNotNull(ingestedChunks.embedding))),
   ]);
 
   return chunks

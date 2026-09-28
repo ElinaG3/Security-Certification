@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { AI_MODELS } from './ai-models';
+import { getActiveCertification } from './active-certification';
 
 const client = new Anthropic();
 
@@ -46,6 +47,7 @@ const gapReportTool: Anthropic.Tool = {
 };
 
 export async function gradeRecallText(recallText: string, sourceMaterial: string, topic: string): Promise<RecallGrade> {
+  const cert = await getActiveCertification();
   const response = await client.messages.create({
     model: AI_MODELS.content,
     max_tokens: 2048,
@@ -54,10 +56,10 @@ export async function gradeRecallText(recallText: string, sourceMaterial: string
     messages: [
       {
         role: 'user',
-        content: `You are grading a free-recall (write-everything-you-know-from-memory) study attempt for the CompTIA Security+ (SY0-701) topic "${topic}". This is feedback, not an exam — be specific and constructive, not a score in prose.
+        content: `You are grading a free-recall (write-everything-you-know-from-memory) study attempt for the ${cert.name} (${cert.examCode}) topic "${topic}". This is feedback, not an exam — be specific and constructive, not a score in prose.
 
 Source material (the ground truth — break it down into distinct key points/concepts):
-"""${sourceMaterial || '(no source material available for this topic — grade only on general SY0-701 accuracy for this topic name)'}"""
+"""${sourceMaterial || `(no source material available for this topic — grade only on general ${cert.examCode} accuracy for this topic name)`}"""
 
 Learner's free-recall text:
 """${recallText}"""
@@ -117,6 +119,7 @@ const transcribeTool: Anthropic.Tool = {
 };
 
 export async function transcribeHandwriting(imageBase64: string, mediaType: string): Promise<TranscriptionResult> {
+  const cert = await getActiveCertification();
   const response = await client.messages.create({
     model: AI_MODELS.content,
     max_tokens: 2048,
@@ -129,7 +132,7 @@ export async function transcribeHandwriting(imageBase64: string, mediaType: stri
           { type: 'image', source: { type: 'base64', media_type: mediaType as 'image/png' | 'image/jpeg', data: imageBase64 } },
           {
             type: 'text',
-            text: 'This is a photo or drawing of handwritten CompTIA Security+ study notes — free-recall prose, a diagram, or both. Transcribe every word of handwritten prose verbatim (best guess on unclear words — do not silently drop anything), and separately describe any diagram/sketch content. Technical terms and acronyms (e.g. "TACACS+", "IPSec") are common — transcribe your best literal reading even if uncertain; the user will review and correct it before grading. Call submit_transcription.',
+            text: `This is a photo or drawing of handwritten ${cert.name} study notes — free-recall prose, a diagram, or both. Transcribe every word of handwritten prose verbatim (best guess on unclear words — do not silently drop anything), and separately describe any diagram/sketch content. Technical terms and acronyms are common — transcribe your best literal reading even if uncertain; the user will review and correct it before grading. Call submit_transcription.`,
           },
         ],
       },
@@ -168,6 +171,7 @@ const drawingCommentTool: Anthropic.Tool = {
 };
 
 export async function commentOnDrawing(imageBase64: string, mediaType: string, topic: string): Promise<string> {
+  const cert = await getActiveCertification();
   const response = await client.messages.create({
     model: AI_MODELS.content,
     max_tokens: 1024,
@@ -180,7 +184,7 @@ export async function commentOnDrawing(imageBase64: string, mediaType: string, t
           { type: 'image', source: { type: 'base64', media_type: mediaType as 'image/png' | 'image/jpeg', data: imageBase64 } },
           {
             type: 'text',
-            text: `This is a study diagram/sketch for the CompTIA Security+ (SY0-701) topic "${topic}". Give qualitative feedback only: what's labeled/shown correctly, what important elements seem to be missing or mislabeled. Do NOT give a score, grade, percentage, or pass/fail verdict of any kind — this is never scored, only commented on. Call submit_drawing_comments.`,
+            text: `This is a study diagram/sketch for the ${cert.name} (${cert.examCode}) topic "${topic}". Give qualitative feedback only: what's labeled/shown correctly, what important elements seem to be missing or mislabeled. Do NOT give a score, grade, percentage, or pass/fail verdict of any kind — this is never scored, only commented on. Call submit_drawing_comments.`,
           },
         ],
       },

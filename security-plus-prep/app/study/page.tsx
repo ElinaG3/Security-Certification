@@ -1,9 +1,10 @@
 import Link from 'next/link';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { getDb } from '@/db';
 import { cards } from '@/db/schema';
 import { getCurrentUser } from '@/lib/auth';
-import { getDueQueue, getPbqWarmupQueue, DEFAULT_SESSION_SIZE } from '@/lib/queue';
+import { getDueQueue, getPbqWarmupQueue } from '@/lib/queue';
+import { getActiveCertificationId } from '@/lib/active-certification';
 import { toPublicContent, type PublicCard } from '@/lib/question-public';
 import type {
   MultipleChoiceContent,
@@ -32,12 +33,14 @@ export default async function StudyPage({
   const isWarmup = mode === 'warmup';
   const user = await getCurrentUser();
   const db = getDb();
+  const certificationId = await getActiveCertificationId();
 
   const [domainRows, queueCards] = await Promise.all([
-    db.selectDistinct({ domain: cards.domain }).from(cards).where(eq(cards.userId, user.id)),
-    isWarmup
-      ? getPbqWarmupQueue({ userId: user.id, limit: DEFAULT_SESSION_SIZE })
-      : getDueQueue({ userId: user.id, domain, limit: DEFAULT_SESSION_SIZE }),
+    db
+      .selectDistinct({ domain: cards.domain })
+      .from(cards)
+      .where(and(eq(cards.userId, user.id), eq(cards.certificationId, certificationId))),
+    isWarmup ? getPbqWarmupQueue({ userId: user.id }) : getDueQueue({ userId: user.id, domain }),
   ]);
 
   // The Server Component boundary: only sanitized content ever leaves this

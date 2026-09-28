@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { getCurrentUser } from '@/lib/auth';
 import { listTopics } from '@/lib/topics';
-import { SY0_701_DOMAINS } from '@/lib/domains';
+import { getActiveDomains } from '@/lib/active-certification';
 
 // listTopics reads live card data — no searchParams/cookies to signal
 // dynamic rendering otherwise, so without this Next would statically
@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function TopicsIndexPage() {
   const user = await getCurrentUser();
-  const { topics, orphanCount } = await listTopics(user.id);
+  const [{ topics, orphanCount }, activeDomains] = await Promise.all([listTopics(user.id), getActiveDomains()]);
 
   const byDomain = new Map<string, typeof topics>();
   for (const t of topics) {
@@ -34,7 +34,7 @@ export default async function TopicsIndexPage() {
         </p>
       )}
 
-      {SY0_701_DOMAINS.map((domain) => {
+      {activeDomains.map((domain) => {
         const domainTopics = byDomain.get(domain) ?? [];
         if (domainTopics.length === 0) return null;
         return (

@@ -5,6 +5,7 @@ import { cards } from '@/db/schema';
 import { getCurrentUser } from '@/lib/auth';
 import { checkCardConsistency } from '@/lib/card-consistency';
 import { generateCardDraft, type GeneratedCardDraft, type DraftRequest } from '@/lib/card-generation';
+import { getActiveCertificationId } from '@/lib/active-certification';
 
 export async function generateDraft(req: DraftRequest): Promise<GeneratedCardDraft> {
   return generateCardDraft(req);
@@ -54,12 +55,13 @@ export async function saveCard(input: SaveCardInput): Promise<SaveCardResult> {
   if (issues.length > 0) return { ok: false, issues };
 
   const db = getDb();
-  const user = await getCurrentUser();
+  const [user, certificationId] = await Promise.all([getCurrentUser(), getActiveCertificationId()]);
 
   const [inserted] = await db
     .insert(cards)
     .values({
       userId: user.id,
+      certificationId,
       domain: input.domain,
       topic: input.topic,
       type: input.type,

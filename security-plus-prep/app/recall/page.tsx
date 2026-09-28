@@ -1,13 +1,13 @@
 import Link from 'next/link';
 import { getCurrentUser } from '@/lib/auth';
 import { listTopics } from '@/lib/topics';
-import { SY0_701_DOMAINS } from '@/lib/domains';
+import { getActiveDomains } from '@/lib/active-certification';
 
 export const dynamic = 'force-dynamic';
 
 export default async function RecallIndexPage() {
   const user = await getCurrentUser();
-  const { topics } = await listTopics(user.id);
+  const [{ topics }, activeDomains] = await Promise.all([listTopics(user.id), getActiveDomains()]);
 
   const byDomain = new Map<string, typeof topics>();
   for (const t of topics) {
@@ -25,7 +25,7 @@ export default async function RecallIndexPage() {
         Pick a topic and write (or draw, or handwrite) everything you know from memory.
       </p>
 
-      {SY0_701_DOMAINS.map((domain) => {
+      {activeDomains.map((domain) => {
         const domainTopics = byDomain.get(domain) ?? [];
         if (domainTopics.length === 0) return null;
         return (

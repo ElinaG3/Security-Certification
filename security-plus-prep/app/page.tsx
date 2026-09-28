@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { getCurrentUser } from '@/lib/auth';
 import { getStudyStats, getDomainRetention, getDomainRecallAccuracy, getTopicProgress, WEAK_THRESHOLD } from '@/lib/dashboard';
-import { SY0_701_DOMAINS } from '@/lib/domains';
+import { getActiveDomains } from '@/lib/active-certification';
 import { DomainBarChart, type DomainBarDatum } from '@/components/dashboard/DomainBarChart';
 
 // Live progress data on every load — no searchParams/cookies to otherwise
@@ -22,11 +22,12 @@ const statTileStyle: React.CSSProperties = {
 
 export default async function HomePage() {
   const user = await getCurrentUser();
-  const [stats, retention, recallAccuracy, topics] = await Promise.all([
+  const [stats, retention, recallAccuracy, topics, activeDomains] = await Promise.all([
     getStudyStats(user.id),
     getDomainRetention(user.id),
     getDomainRecallAccuracy(user.id),
     getTopicProgress(user.id),
+    getActiveDomains(),
   ]);
 
   const retentionData: DomainBarDatum[] = retention.map((r) => ({
@@ -145,7 +146,7 @@ export default async function HomePage() {
         {topics.length === 0 ? (
           <p style={{ color: '#666' }}>No topics yet — cards need an objective assigned before they show up here.</p>
         ) : (
-          SY0_701_DOMAINS.map((domain) => {
+          activeDomains.map((domain) => {
             const domainTopics = byDomain.get(domain) ?? [];
             if (domainTopics.length === 0) return null;
             return (

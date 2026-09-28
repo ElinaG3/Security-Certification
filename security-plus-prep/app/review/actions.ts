@@ -5,6 +5,7 @@ import { getDb } from '@/db';
 import { cards } from '@/db/schema';
 import { getCurrentUser } from '@/lib/auth';
 import { checkCardConsistency } from '@/lib/card-consistency';
+import { getActiveCertificationId } from '@/lib/active-certification';
 import type { MultipleChoiceContent, MultipleSelectContent } from '@/db/question-types';
 
 // Spot-check tool over ACTIVE cards (batch generation auto-approves on a
@@ -45,10 +46,11 @@ function toReviewCard(row: typeof cards.$inferSelect): ReviewCard {
 export async function listPendingCards(): Promise<ReviewCard[]> {
   const user = await getCurrentUser();
   const db = getDb();
+  const certificationId = await getActiveCertificationId();
   const rows = await db
     .select()
     .from(cards)
-    .where(and(eq(cards.userId, user.id), eq(cards.status, 'pending')))
+    .where(and(eq(cards.userId, user.id), eq(cards.certificationId, certificationId), eq(cards.status, 'pending')))
     .orderBy(desc(cards.createdAt));
   return rows.filter((r) => r.type === 'multiple_choice' || r.type === 'multiple_select').map(toReviewCard);
 }
@@ -68,10 +70,12 @@ export async function listActiveCards({
 }): Promise<{ cards: ReviewCard[]; total: number }> {
   const user = await getCurrentUser();
   const db = getDb();
+  const certificationId = await getActiveCertificationId();
 
   const trimmedQuery = query?.trim();
   const where = and(
     eq(cards.userId, user.id),
+    eq(cards.certificationId, certificationId),
     eq(cards.status, 'active'),
     domain ? eq(cards.domain, domain) : undefined,
     flaggedOnly ? eq(cards.flagged, true) : undefined,

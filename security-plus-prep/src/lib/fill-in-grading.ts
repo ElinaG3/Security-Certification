@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { AI_MODELS } from './ai-models';
+import { getActiveCertification } from './active-certification';
 
 const client = new Anthropic();
 
@@ -75,6 +76,7 @@ const gradeTool: Anthropic.Tool = {
 };
 
 async function aiNearMissCheck(userAnswer: string, acceptedAnswers: string[]): Promise<boolean> {
+  const cert = await getActiveCertification();
   const response = await client.messages.create({
     model: AI_MODELS.fast,
     max_tokens: 32,
@@ -83,7 +85,7 @@ async function aiNearMissCheck(userAnswer: string, acceptedAnswers: string[]): P
     messages: [
       {
         role: 'user',
-        content: `CompTIA Security+ (SY0-701) fill-in-the-blank grading. Candidate answer: "${userAnswer}". Accepted answer(s): ${acceptedAnswers.map((a) => `"${a}"`).join(', ')}. Is the candidate answer functionally equivalent to one of the accepted answers (same security concept/term, allowing for phrasing, capitalization, or minor typos) — not just a related-but-different term? Call grade_answer.`,
+        content: `${cert.name} (${cert.examCode}) fill-in-the-blank grading. Candidate answer: "${userAnswer}". Accepted answer(s): ${acceptedAnswers.map((a) => `"${a}"`).join(', ')}. Is the candidate answer functionally equivalent to one of the accepted answers (same concept/term, allowing for phrasing, capitalization, or minor typos) — not just a related-but-different term? Call grade_answer.`,
       },
     ],
   });

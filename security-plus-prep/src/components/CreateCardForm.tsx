@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { generateDraft, saveCard, type SaveCardInput } from '../../app/create/actions';
-import { SY0_701_DOMAINS } from '@/lib/domains';
 import type { GeneratedCardDraft } from '@/lib/card-generation';
 
 type DraftState = {
@@ -38,9 +37,9 @@ const inputStyle: React.CSSProperties = {
 
 const labelStyle: React.CSSProperties = { display: 'block', fontWeight: 600, marginBottom: 4, fontSize: 14 };
 
-export function CreateCardForm() {
+export function CreateCardForm({ domains }: { domains: string[] }) {
   const [note, setNote] = useState('');
-  const [domain, setDomain] = useState<string>(SY0_701_DOMAINS[0]);
+  const [domain, setDomain] = useState<string>(domains[0] ?? '');
   const [objective, setObjective] = useState('');
   const [type, setType] = useState<'multiple_choice' | 'multiple_select'>('multiple_choice');
   const [requiredCount, setRequiredCount] = useState<2 | 3>(2);
@@ -177,7 +176,7 @@ export function CreateCardForm() {
           <div style={{ flex: '1 1 240px' }}>
             <label style={labelStyle}>Domain</label>
             <select value={domain} onChange={(e) => setDomain(e.target.value)} style={inputStyle}>
-              {SY0_701_DOMAINS.map((d) => (
+              {domains.map((d) => (
                 <option key={d} value={d}>
                   {d}
                 </option>

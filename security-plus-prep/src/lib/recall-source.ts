@@ -1,6 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import { getDb } from '@/db';
 import { cards, ingestedChunks } from '@/db/schema';
+import { getActiveCertificationId } from './active-certification';
 import type { MultipleChoiceContent, MultipleSelectContent } from '@/db/question-types';
 
 // What "the topic's source material" means for recall grading: the raw
@@ -13,10 +14,17 @@ import type { MultipleChoiceContent, MultipleSelectContent } from '@/db/question
 export async function getSourceMaterialForObjective(objective: string | null, userId: string): Promise<string> {
   if (!objective) return '';
   const db = getDb();
+  const certificationId = await getActiveCertificationId();
 
   const [chunks, cardRows] = await Promise.all([
-    db.select({ content: ingestedChunks.content, sectionTitle: ingestedChunks.sectionTitle }).from(ingestedChunks).where(eq(ingestedChunks.objective, objective)),
-    db.select().from(cards).where(and(eq(cards.userId, userId), eq(cards.objective, objective), eq(cards.status, 'active'))),
+    db
+      .select({ content: ingestedChunks.content, sectionTitle: ingestedChunks.sectionTitle })
+      .from(ingestedChunks)
+      .where(and(eq(ingestedChunks.certificationId, certificationId), eq(ingestedChunks.objective, objective))),
+    db
+      .select()
+      .from(cards)
+      .where(and(eq(cards.userId, userId), eq(cards.certificationId, certificationId), eq(cards.objective, objective), eq(cards.status, 'active'))),
   ]);
 
   const parts: string[] = [];

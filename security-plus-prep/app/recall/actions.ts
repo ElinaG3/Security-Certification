@@ -7,6 +7,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { uploadRecallImage } from '@/lib/blob';
 import { getSourceMaterialForObjective } from '@/lib/recall-source';
 import { gradeRecallText, transcribeHandwriting, commentOnDrawing, type GapReport } from '@/lib/recall-grading';
+import { getActiveCertificationId } from '@/lib/active-certification';
 
 async function fileToBase64(file: File): Promise<{ data: string; mediaType: string }> {
   const buf = Buffer.from(await file.arrayBuffer());
@@ -36,6 +37,7 @@ export async function submitTypedRecall({
 }): Promise<RecallResult> {
   const user = await getCurrentUser();
   const db = getDb();
+  const certificationId = await getActiveCertificationId();
 
   const sourceMaterial = await getSourceMaterialForObjective(objective, user.id);
   const { score, ...gapReport } = await gradeRecallText(text, sourceMaterial, topic);
@@ -52,6 +54,7 @@ export async function submitTypedRecall({
     .insert(recallAttempts)
     .values({
       userId: user.id,
+      certificationId,
       objective,
       topic,
       inputMode: 'typed',
@@ -103,6 +106,7 @@ export async function submitHandwrittenRecall({
 }): Promise<RecallResult> {
   const user = await getCurrentUser();
   const db = getDb();
+  const certificationId = await getActiveCertificationId();
 
   const sourceMaterial = await getSourceMaterialForObjective(objective, user.id);
   const { score, ...gapReport } = await gradeRecallText(confirmedTranscription, sourceMaterial, topic);
@@ -111,6 +115,7 @@ export async function submitHandwrittenRecall({
     .insert(recallAttempts)
     .values({
       userId: user.id,
+      certificationId,
       objective,
       topic,
       inputMode: 'handwritten',
@@ -140,6 +145,7 @@ export async function submitDrawingOnly({
 }): Promise<{ attemptId: string; drawingComments: string }> {
   const user = await getCurrentUser();
   const db = getDb();
+  const certificationId = await getActiveCertificationId();
 
   const [drawingUrl, { data, mediaType }] = await Promise.all([
     uploadRecallImage(user.id, drawingFile, 'drawing'),
@@ -149,7 +155,7 @@ export async function submitDrawingOnly({
 
   const [row] = await db
     .insert(recallAttempts)
-    .values({ userId: user.id, objective, topic, inputMode: 'drawing_only', drawingUrl, drawingComments })
+    .values({ userId: user.id, certificationId, objective, topic, inputMode: 'drawing_only', drawingUrl, drawingComments })
     .returning();
 
   return { attemptId: row.id, drawingComments };
@@ -169,10 +175,11 @@ export interface RecallAttemptSummary {
 export async function listRecallAttempts(objective: string): Promise<RecallAttemptSummary[]> {
   const user = await getCurrentUser();
   const db = getDb();
+  const certificationId = await getActiveCertificationId();
   const rows = await db
     .select()
     .from(recallAttempts)
-    .where(and(eq(recallAttempts.userId, user.id), eq(recallAttempts.objective, objective)))
+    .where(and(eq(recallAttempts.userId, user.id), eq(recallAttempts.certificationId, certificationId), eq(recallAttempts.objective, objective)))
     .orderBy(desc(recallAttempts.createdAt));
 
   return rows.map((r) => ({

@@ -2,7 +2,7 @@ import { and, eq, isNotNull } from 'drizzle-orm';
 import { getDb } from '@/db';
 import { cards, reviewLog, recallAttempts } from '@/db/schema';
 import { computeRetrievability } from './fsrs';
-import { SY0_701_DOMAINS, DOMAIN_BY_OBJECTIVE_PREFIX, domainForObjective } from './domains';
+import { getActiveCertificationId, getActiveDomains, getActiveDomainWeights, getActiveObjectives } from './active-certification';
 import { objectiveLabels } from './topics';
 
 // A card/topic "counts" toward retention only once it's actually been
@@ -10,14 +10,6 @@ import { objectiveLabels } from './topics';
 // defaulted to 0% or 100%, which would misrepresent unstudied material as
 // either failing or mastered.
 export const WEAK_THRESHOLD = 0.6; // 60% — below this, retention or recall accuracy is surfaced as weak
-
-export const OFFICIAL_DOMAIN_WEIGHTS: Record<string, number> = {
-  'General Security Concepts': 12,
-  'Threats, Vulnerabilities, & Mitigations': 22,
-  'Security Architecture': 18,
-  'Security Operations': 28,
-  'Security Program Management and Oversight': 20,
-};
 
 export interface StudyStats {
   cardsStudied: number;
@@ -28,9 +20,19 @@ export interface StudyStats {
 
 export async function getStudyStats(userId: string): Promise<StudyStats> {
   const db = getDb();
+  const certificationId = await getActiveCertificationId();
   const [activeCards, reviewDates] = await Promise.all([
-    db.select({ reps: cards.reps }).from(cards).where(and(eq(cards.userId, userId), eq(cards.status, 'active'))),
-    db.select({ review: reviewLog.review }).from(reviewLog).where(eq(reviewLog.userId, userId)),
+    db
+      .select({ reps: cards.reps })
+      .from(cards)
+      .where(and(eq(cards.userId, userId), eq(cards.certificationId, certificationId), eq(cards.status, 'active'))),
+    // review_log has no certification_id of its own — it inherits scope via
+    // its card, so this joins through cards to filter to the active cert.
+    db
+      .select({ review: reviewLog.review })
+      .from(reviewLog)
+      .innerJoin(cards, eq(reviewLog.cardId, cards.id))
+      .where(and(eq(reviewLog.userId, userId), eq(cards.certificationId, certificationId))),
   ]);
 
   const cardsStudied = activeCards.filter((c) => c.reps > 0).length;
@@ -69,14 +71,22 @@ export interface DomainRetention {
 
 export async function getDomainRetention(userId: string): Promise<DomainRetention[]> {
   const db = getDb();
-  const rows = await db.select().from(cards).where(and(eq(cards.userId, userId), eq(cards.status, 'active')));
+  const [certificationId, domains, weights] = await Promise.all([
+    getActiveCertificationId(),
+    getActiveDomains(),
+    getActiveDomainWeights(),
+  ]);
+  const rows = await db
+    .select()
+    .from(cards)
+    .where(and(eq(cards.userId, userId), eq(cards.certificationId, certificationId), eq(cards.status, 'active')));
 
   const byDomain = new Map<string, { sum: number; reviewed: number; total: number }>();
-  for (const domain of SY0_701_DOMAINS) byDomain.set(domain, { sum: 0, reviewed: 0, total: 0 });
+  for (const domain of domains) byDomain.set(domain, { sum: 0, reviewed: 0, total: 0 });
 
   for (const row of rows) {
     const bucket = byDomain.get(row.domain);
-    if (!bucket) continue; // a domain string that isn't one of the 5 official ones — skip rather than guess
+    if (!bucket) continue; // a domain string that isn't one of the active cert's own — skip rather than guess
     bucket.total++;
     const r = computeRetrievability(row);
     if (r !== null) {
@@ -85,14 +95,14 @@ export async function getDomainRetention(userId: string): Promise<DomainRetentio
     }
   }
 
-  return SY0_701_DOMAINS.map((domain) => {
+  return domains.map((domain) => {
     const b = byDomain.get(domain)!;
     return {
       domain,
       retention: b.reviewed > 0 ? b.sum / b.reviewed : null,
       reviewedCount: b.reviewed,
       totalCount: b.total,
-      targetWeight: OFFICIAL_DOMAIN_WEIGHTS[domain],
+      targetWeight: weights[domain],
     };
   });
 }
@@ -105,24 +115,32 @@ export interface DomainRecallAccuracy {
 
 export async function getDomainRecallAccuracy(userId: string): Promise<DomainRecallAccuracy[]> {
   const db = getDb();
+  const [certificationId, domains, objectivesList] = await Promise.all([
+    getActiveCertificationId(),
+    getActiveDomains(),
+    getActiveObjectives(),
+  ]);
+  const domainByObjective = new Map(objectivesList.map((o) => [o.number, o.domain]));
+
   const rows = await db
     .select({ objective: recallAttempts.objective, score: recallAttempts.score })
     .from(recallAttempts)
-    .where(and(eq(recallAttempts.userId, userId), isNotNull(recallAttempts.score)));
+    .where(and(eq(recallAttempts.userId, userId), eq(recallAttempts.certificationId, certificationId), isNotNull(recallAttempts.score)));
 
   const byDomain = new Map<string, { sum: number; count: number }>();
-  for (const domain of SY0_701_DOMAINS) byDomain.set(domain, { sum: 0, count: 0 });
+  for (const domain of domains) byDomain.set(domain, { sum: 0, count: 0 });
 
   for (const row of rows) {
     if (!row.objective || row.score === null) continue;
-    const domain = domainForObjective(row.objective);
+    const domain = domainByObjective.get(row.objective);
     if (!domain) continue;
-    const bucket = byDomain.get(domain)!;
+    const bucket = byDomain.get(domain);
+    if (!bucket) continue;
     bucket.sum += row.score;
     bucket.count++;
   }
 
-  return SY0_701_DOMAINS.map((domain) => {
+  return domains.map((domain) => {
     const b = byDomain.get(domain)!;
     return { domain, accuracy: b.count > 0 ? b.sum / b.count : null, attemptCount: b.count };
   });
@@ -142,19 +160,25 @@ export interface TopicProgress {
 
 export async function getTopicProgress(userId: string): Promise<TopicProgress[]> {
   const db = getDb();
+  const [certificationId, objectivesList] = await Promise.all([getActiveCertificationId(), getActiveObjectives()]);
+  const domainByObjective = new Map(objectivesList.map((o) => [o.number, o.domain]));
+
   const [cardRows, recallRows] = await Promise.all([
-    db.select().from(cards).where(and(eq(cards.userId, userId), eq(cards.status, 'active'))),
+    db
+      .select()
+      .from(cards)
+      .where(and(eq(cards.userId, userId), eq(cards.certificationId, certificationId), eq(cards.status, 'active'))),
     db
       .select({ objective: recallAttempts.objective, score: recallAttempts.score })
       .from(recallAttempts)
-      .where(eq(recallAttempts.userId, userId)),
+      .where(and(eq(recallAttempts.userId, userId), eq(recallAttempts.certificationId, certificationId))),
   ]);
 
   type Bucket = { domain: string; sum: number; reviewed: number; total: number; flagged: number };
   const byObjective = new Map<string, Bucket>();
   for (const row of cardRows) {
     if (!row.objective) continue;
-    const domain = DOMAIN_BY_OBJECTIVE_PREFIX[row.objective.split('.')[0]];
+    const domain = domainByObjective.get(row.objective);
     if (!domain) continue;
     if (!byObjective.has(row.objective)) byObjective.set(row.objective, { domain, sum: 0, reviewed: 0, total: 0, flagged: 0 });
     const b = byObjective.get(row.objective)!;
@@ -186,7 +210,7 @@ export async function getTopicProgress(userId: string): Promise<TopicProgress[]>
 
   const result: TopicProgress[] = [];
   for (const objective of allObjectives) {
-    const domain = byObjective.get(objective)?.domain ?? domainForObjective(objective);
+    const domain = byObjective.get(objective)?.domain ?? domainByObjective.get(objective);
     if (!domain) continue;
     const cardBucket = byObjective.get(objective);
     const recallBucket = recallByObjective.get(objective);
