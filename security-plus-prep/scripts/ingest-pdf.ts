@@ -22,22 +22,27 @@
 // (currently just SY0-601 — two exam versions out of date).
 //
 // Usage:
-//   npx dotenv-cli -e .env -- tsx scripts/ingest-pdf.ts [path-to-pdf]
-//   (defaults to Professor Messer's SY0-701 course notes in ~/Downloads)
+//   npx dotenv-cli -- tsx scripts/ingest-pdf.ts [path-to-pdf] [--certification-id=<uuid>]
+//   (defaults to Professor Messer's SY0-701 course notes in ~/Downloads,
+//   and to the SY0-701 certification row when --certification-id is
+//   omitted — genuinely reusable across certs: it derives domain/exam-name
+//   from the target certification row and objectives table, not a
+//   hardcoded plan, since this script is driven by the source PDF's own
+//   content rather than hand-authored per-objective hints.)
 
 import { readFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { PDFParse } from 'pdf-parse';
-import { eq, sql } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import { getDb } from '../src/db';
 import { cards, ingestedChunks } from '../src/db/schema';
 import { getCurrentUser } from '../src/lib/auth';
 import { AI_MODELS } from '../src/lib/ai-models';
 import { embedText, cosineSimilarity } from '../src/lib/embeddings';
 import { shuffleChoiceContent } from '../src/lib/option-order';
-import { domainForObjective as sharedDomainForObjective } from '../src/lib/domains';
+import { parseCertificationIdArg, resolveCliCertification, domainForObjectiveIn, type CliCertification } from './cli-certification';
 import { checkCardConsistency } from './check-card-consistency';
 import type { MultipleChoiceContent, MultipleSelectContent } from '../src/db/question-types';
 
@@ -65,11 +70,6 @@ const DEFAULT_PDF_PATH = '/home/elina/Downloads/professor-messer-sy0-701-comptia
 const DENYLIST_PATTERNS = [/sy0[-_ ]?601/i];
 
 const client = new Anthropic();
-
-function domainForObjective(objective: string | null): string | null {
-  if (!objective) return null;
-  return sharedDomainForObjective(objective);
-}
 
 // ---------------------------------------------------------------------
 // 1-2. Extraction + chunking
@@ -130,9 +130,12 @@ function cardEmbeddingText(content: MultipleChoiceContent | MultipleSelectConten
   return [content.question, ...content.options, content.explanation].join(' ');
 }
 
-async function loadOrCreateChunks(sourceFile: string, rawChunks: RawChunk[]) {
+async function loadOrCreateChunks(sourceFile: string, rawChunks: RawChunk[], certificationId: string) {
   const db = getDb();
-  const existing = await db.select().from(ingestedChunks).where(eq(ingestedChunks.sourceFile, sourceFile));
+  const existing = await db
+    .select()
+    .from(ingestedChunks)
+    .where(and(eq(ingestedChunks.sourceFile, sourceFile), eq(ingestedChunks.certificationId, certificationId)));
   if (existing.length > 0) {
     console.log(`Found ${existing.length} previously-ingested chunk(s) for ${sourceFile} — reusing, skipping re-extraction.`);
     return existing;
@@ -146,6 +149,7 @@ async function loadOrCreateChunks(sourceFile: string, rawChunks: RawChunk[]) {
     const [inserted] = await db
       .insert(ingestedChunks)
       .values({
+        certificationId,
         sourceFile,
         objective: raw.objective,
         sectionTitle: raw.sectionTitle,
@@ -158,7 +162,7 @@ async function loadOrCreateChunks(sourceFile: string, rawChunks: RawChunk[]) {
   return rows;
 }
 
-async function scoreNovelty(chunkRows: (typeof ingestedChunks.$inferSelect)[]) {
+async function scoreNovelty(chunkRows: (typeof ingestedChunks.$inferSelect)[], certificationId: string) {
   const db = getDb();
   // Always rescore every not-yet-used chunk, not just ones scored null
   // before — the active pool grows with each ingestion run (including
@@ -169,7 +173,10 @@ async function scoreNovelty(chunkRows: (typeof ingestedChunks.$inferSelect)[]) {
   if (toScore.length === 0) return;
 
   console.log(`Scoring novelty for ${toScore.length} chunk(s) against the active card pool...`);
-  const activeCards = await db.select().from(cards).where(eq(cards.status, 'active'));
+  const activeCards = await db
+    .select()
+    .from(cards)
+    .where(and(eq(cards.status, 'active'), eq(cards.certificationId, certificationId)));
   const mcMs = activeCards.filter((c) => c.type === 'multiple_choice' || c.type === 'multiple_select');
   const cardEmbeddings: number[][] = [];
   for (const card of mcMs) {
@@ -216,8 +223,9 @@ function assignLengthTier(indexOverall: number): LengthTier {
   return indexOverall % 3 === 0 ? 'short' : 'full';
 }
 
-function buildSlots(selected: (typeof ingestedChunks.$inferSelect)[]): Slot[] {
+function buildSlots(selected: (typeof ingestedChunks.$inferSelect)[], cert: CliCertification): Slot[] {
   const sectionCounters = new Map<string, number>();
+  const fallbackDomain = cert.domains[0]?.name ?? 'General';
   return selected.map((chunk, i) => {
     const key = chunk.sectionTitle ?? '';
     const secIndex = sectionCounters.get(key) ?? 0;
@@ -225,7 +233,7 @@ function buildSlots(selected: (typeof ingestedChunks.$inferSelect)[]): Slot[] {
     const isMs = i % 4 === 3; // ~25%
     return {
       chunk,
-      domain: domainForObjective(chunk.objective) ?? 'General Security Concepts',
+      domain: (chunk.objective && domainForObjectiveIn(cert, chunk.objective)) ?? fallbackDomain,
       type: isMs ? ('multiple_select' as const) : ('multiple_choice' as const),
       requiredCount: isMs ? (i % 8 === 3 ? 3 : 2) : undefined,
       qualifier: assignQualifier(key, secIndex, i),
@@ -247,9 +255,10 @@ const GeneratedCardSchema = z.object({
 });
 type GeneratedCard = z.infer<typeof GeneratedCardSchema>;
 
-const submitCardsTool: Anthropic.Tool = {
+function submitCardsTool(cert: CliCertification): Anthropic.Tool {
+  return {
   name: 'submit_cards',
-  description: 'Submit a batch of new CompTIA Security+ (SY0-701) practice questions derived from source study notes.',
+  description: `Submit a batch of new ${cert.name} (${cert.examCode}) practice questions derived from source study notes.`,
   input_schema: {
     type: 'object',
     properties: {
@@ -282,13 +291,14 @@ const submitCardsTool: Anthropic.Tool = {
     },
     required: ['cards'],
   },
-};
+  };
+}
 
-function buildPrompt(slots: Slot[]): string {
+function buildPrompt(slots: Slot[], cert: CliCertification): string {
   const spec = slots
     .map((s, i) => {
       const lines = [
-        `${i + 1}. domain: "${s.domain}", SY0-701 objective ${s.chunk.objective} (${s.chunk.sectionTitle})`,
+        `${i + 1}. domain: "${s.domain}", ${cert.examCode} objective ${s.chunk.objective} (${s.chunk.sectionTitle})`,
         `   type: ${s.type}`,
         `   qualifier: ${s.qualifier}`,
         `   length: ${s.lengthTier}`,
@@ -300,9 +310,9 @@ function buildPrompt(slots: Slot[]): string {
     })
     .join('\n\n');
 
-  return `Write ${slots.length} original CompTIA Security+ (SY0-701) practice questions, one per spec below. Each spec's "source material" is raw outline notes on the concept to test — turn it into a scenario-based question, never a fill-in-the-blank restatement of the notes themselves.
+  return `Write ${slots.length} original ${cert.name} (${cert.examCode}) practice questions, one per spec below. Each spec's "source material" is raw outline notes on the concept to test — turn it into a scenario-based question, never a fill-in-the-blank restatement of the notes themselves.
 
-WHY THIS MATTERS: candidate feedback on the real SY0-701 exam consistently says the hard part isn't obscure facts — it's that multiple options all look correct, and you must pick the BEST one by CompTIA's logic. These must recreate that difficulty, not test rote recall of the source notes.
+WHY THIS MATTERS: candidate feedback on the real ${cert.examCode} exam consistently says the hard part isn't obscure facts — it's that multiple options all look correct, and you must pick the BEST one by the exam's own logic. These must recreate that difficulty, not test rote recall of the source notes.
 
 EVERY QUESTION — including multiple_select — has EXACTLY 4 options TOTAL. Never 5, never 6. options.length === 4 always. This is non-negotiable: for a multiple_select card with requiredCount 2, that means exactly 2 correct + 2 incorrect = 4 total, not 2 correct + 3 incorrect.
 
@@ -337,13 +347,13 @@ ${spec}
 Call submit_cards with exactly ${slots.length} entries, in the same order as the specs above.`;
 }
 
-async function generateBatch(slots: Slot[]): Promise<(GeneratedCard | null)[]> {
+async function generateBatch(slots: Slot[], cert: CliCertification): Promise<(GeneratedCard | null)[]> {
   const response = await client.messages.create({
     model: MODEL,
     max_tokens: 8192,
-    tools: [submitCardsTool],
+    tools: [submitCardsTool(cert)],
     tool_choice: { type: 'tool', name: 'submit_cards' },
-    messages: [{ role: 'user', content: buildPrompt(slots) }],
+    messages: [{ role: 'user', content: buildPrompt(slots, cert) }],
   });
 
   const toolUse = response.content.find((block): block is Anthropic.ToolUseBlock => block.type === 'tool_use');
@@ -400,7 +410,7 @@ function findIssues(card: GeneratedCard, content: ReturnType<typeof contentFromC
 
 type PassResult = { slot: Slot; card: GeneratedCard | null; issues: string[] };
 
-async function runPass(slots: Slot[]): Promise<PassResult[]> {
+async function runPass(slots: Slot[], cert: CliCertification): Promise<PassResult[]> {
   const batches = chunkArray(slots, BATCH_SIZE);
   const results: PassResult[] = [];
 
@@ -409,7 +419,7 @@ async function runPass(slots: Slot[]): Promise<PassResult[]> {
 
     let generated: (GeneratedCard | null)[];
     try {
-      generated = await generateBatch(batch);
+      generated = await generateBatch(batch, cert);
     } catch (err) {
       console.log(`    BATCH FAILED (${err instanceof Error ? err.message : String(err)}) — all ${batch.length} card(s) in this batch will retry.`);
       generated = batch.map(() => null);
@@ -436,8 +446,13 @@ async function runPass(slots: Slot[]): Promise<PassResult[]> {
 const MAX_ATTEMPTS = 3;
 
 async function main() {
-  const sourcePath = process.argv[2] ?? DEFAULT_PDF_PATH;
+  // Positional path arg, distinct from --flags so `--certification-id=`
+  // can appear before or after it.
+  const sourcePath = process.argv.slice(2).find((a) => !a.startsWith('--')) ?? DEFAULT_PDF_PATH;
   const sourceFile = basename(sourcePath);
+
+  const cert = await resolveCliCertification(parseCertificationIdArg());
+  console.log(`Target certification: ${cert.name} (${cert.examCode})`);
 
   if (DENYLIST_PATTERNS.some((re) => re.test(sourceFile))) {
     console.error(`Refusing to ingest "${sourceFile}" — matches the exam-version denylist (too old to be worth ingesting).`);
@@ -454,8 +469,8 @@ async function main() {
   const rawChunks = chunkText(extracted.text);
   console.log(`Parsed ${rawChunks.length} content chunk(s).`);
 
-  const chunkRows = await loadOrCreateChunks(sourceFile, rawChunks);
-  await scoreNovelty(chunkRows);
+  const chunkRows = await loadOrCreateChunks(sourceFile, rawChunks, cert.id);
+  await scoreNovelty(chunkRows, cert.id);
 
   const eligible = chunkRows
     .filter((c) => !c.usedForGeneration && c.objective !== null)
@@ -480,13 +495,13 @@ async function main() {
   const user = await getCurrentUser();
 
   let approvedCount = 0;
-  let currentSlots = buildSlots(selected);
+  let currentSlots = buildSlots(selected, cert);
   const lastAttempt = new Map<Slot, PassResult>();
   const resolvedChunkIds = new Set<string>();
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS && currentSlots.length > 0; attempt++) {
     console.log(`\nAttempt ${attempt}/${MAX_ATTEMPTS}: ${currentSlots.length} card(s)...`);
-    const results = await runPass(currentSlots);
+    const results = await runPass(currentSlots, cert);
     const stillFailing: Slot[] = [];
 
     for (const result of results) {
@@ -496,6 +511,7 @@ async function main() {
       if (card && issues.length === 0) {
         await db.insert(cards).values({
           userId: user.id,
+          certificationId: cert.id,
           domain: slot.domain,
           topic: card.topic,
           type: card.type,
@@ -524,6 +540,7 @@ async function main() {
     if (result?.card) {
       await db.insert(cards).values({
         userId: user.id,
+        certificationId: cert.id,
         domain: slot.domain,
         topic: result.card.topic,
         type: result.card.type,

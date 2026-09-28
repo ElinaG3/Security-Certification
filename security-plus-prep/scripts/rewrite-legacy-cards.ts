@@ -14,8 +14,13 @@
 // untouched for manual follow-up.
 //
 // Usage:
-//   npx dotenv-cli -e .env -- tsx scripts/rewrite-legacy-cards.ts --sample
-//   npx dotenv-cli -e .env -- tsx scripts/rewrite-legacy-cards.ts
+//   npx dotenv-cli -- tsx scripts/rewrite-legacy-cards.ts --sample
+//   npx dotenv-cli -- tsx scripts/rewrite-legacy-cards.ts
+//
+// Inherently SY0-701-only, by definition, not just by convenience: it
+// rewrites the 135 legacy SY0-701 seed cards specifically — a
+// --certification-id for a different cert would have no "legacy cards" of
+// its own to rewrite. Refuses to run against anything else (requireSy0701).
 
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
@@ -26,6 +31,7 @@ import { getCurrentUser } from '../src/lib/auth';
 import { AI_MODELS } from '../src/lib/ai-models';
 import { shuffleChoiceContent } from '../src/lib/option-order';
 import { checkCardConsistency } from './check-card-consistency';
+import { parseCertificationIdArg, resolveCliCertification, requireSy0701 } from './cli-certification';
 
 const MODEL = AI_MODELS.content;
 const BATCH_SIZE = 5;
@@ -351,8 +357,13 @@ const MAX_ATTEMPTS = 3;
 async function main() {
   const sampleArg = process.argv.includes('--sample');
   const db = getDb();
+  const cert = await resolveCliCertification(parseCertificationIdArg());
+  requireSy0701(cert, 'rewrite-legacy-cards.ts');
 
-  const originals = await db.select().from(cards).where(and(eq(cards.sourceType, 'manual-seed'), eq(cards.status, 'active')));
+  const originals = await db
+    .select()
+    .from(cards)
+    .where(and(eq(cards.sourceType, 'manual-seed'), eq(cards.status, 'active'), eq(cards.certificationId, cert.id)));
   console.log(`Found ${originals.length} legacy cards eligible for rewrite.`);
 
   const initialSlots = sampleArg ? buildSampleSlots(originals) : assignTypes(originals);
@@ -395,6 +406,7 @@ async function main() {
           .insert(cards)
           .values({
             userId: user.id,
+            certificationId: cert.id,
             domain: slot.original.domain,
             topic: slot.original.topic,
             type: card.type,
@@ -425,6 +437,7 @@ async function main() {
       const content = contentFromCard(result.card);
       await db.insert(cards).values({
         userId: user.id,
+        certificationId: cert.id,
         domain: slot.original.domain,
         topic: slot.original.topic,
         type: result.card.type,

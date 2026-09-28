@@ -1,3 +1,12 @@
+// Usage:
+//   npx dotenv-cli -- tsx scripts/generate-explanations.ts [--sample=N] [--certification-id=<uuid>]
+//
+// Content-agnostic — backfills missing distractor explanations for
+// whatever multiple_choice cards exist, driven by each card's own
+// question/options/explanation, not a hardcoded plan — so this one is
+// genuinely reusable across certs via --certification-id (default
+// SY0-701).
+
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { eq, and, inArray, notInArray } from 'drizzle-orm';
@@ -6,6 +15,7 @@ import { cards, explanationSuggestions } from '../src/db/schema';
 import { getCurrentUser } from '../src/lib/auth';
 import type { MultipleChoiceContent } from '../src/db/question-types';
 import { AI_MODELS } from '../src/lib/ai-models';
+import { parseCertificationIdArg, resolveCliCertification, type CliCertification } from './cli-certification';
 
 const MODEL = AI_MODELS.content;
 const BATCH_SIZE = 15;
@@ -21,7 +31,8 @@ const BatchResultSchema = z.object({
   ),
 });
 
-const submitExplanationsTool: Anthropic.Tool = {
+function submitExplanationsTool(cert: CliCertification): Anthropic.Tool {
+  return {
   name: 'submit_explanations',
   description: 'Submit per-distractor explanations for a batch of multiple-choice questions.',
   input_schema: {
@@ -35,8 +46,7 @@ const submitExplanationsTool: Anthropic.Tool = {
             cardId: { type: 'string', description: 'The id of the card this entry answers' },
             distractorExplanations: {
               type: 'array',
-              description:
-                'One entry per option, same order as the question options. For the correct option, use an empty string. For each wrong option, one concise sentence explaining why it is wrong in the context of the CompTIA Security+ (SY0-701) exam.',
+              description: `One entry per option, same order as the question options. For the correct option, use an empty string. For each wrong option, one concise sentence explaining why it is wrong in the context of the ${cert.name} (${cert.examCode}) exam.`,
               items: { type: 'string' },
             },
           },
@@ -46,7 +56,8 @@ const submitExplanationsTool: Anthropic.Tool = {
     },
     required: ['explanations'],
   },
-};
+  };
+}
 
 type Batchable = {
   id: string;
@@ -55,7 +66,7 @@ type Batchable = {
   content: MultipleChoiceContent;
 };
 
-function buildPrompt(batch: Batchable[]): string {
+function buildPrompt(batch: Batchable[], cert: CliCertification): string {
   const questions = batch
     .map((card, i) => {
       const { question, options, correct, explanation } = card.content;
@@ -70,20 +81,20 @@ Existing explanation for the correct answer: ${explanation}`;
     })
     .join('\n\n');
 
-  return `For each of the following CompTIA Security+ (SY0-701) multiple-choice questions, write a one-sentence explanation for why each WRONG option is incorrect. Use the empty string for the correct option's entry. Keep each explanation concise (one sentence) and specific to the option, not a restatement of the correct answer.
+  return `For each of the following ${cert.name} (${cert.examCode}) multiple-choice questions, write a one-sentence explanation for why each WRONG option is incorrect. Use the empty string for the correct option's entry. Keep each explanation concise (one sentence) and specific to the option, not a restatement of the correct answer.
 
 ${questions}
 
 Call submit_explanations with one entry per question above, in the same order, using the exact cardId given.`;
 }
 
-async function generateBatch(batch: Batchable[]) {
+async function generateBatch(batch: Batchable[], cert: CliCertification) {
   const response = await client.messages.create({
     model: MODEL,
     max_tokens: 4096,
-    tools: [submitExplanationsTool],
+    tools: [submitExplanationsTool(cert)],
     tool_choice: { type: 'tool', name: 'submit_explanations' },
-    messages: [{ role: 'user', content: buildPrompt(batch) }],
+    messages: [{ role: 'user', content: buildPrompt(batch, cert) }],
   });
 
   const toolUse = response.content.find(
@@ -106,6 +117,8 @@ async function main() {
 
   const db = getDb();
   const user = await getCurrentUser();
+  const cert = await resolveCliCertification(parseCertificationIdArg());
+  console.log(`Target certification: ${cert.name} (${cert.examCode})`);
 
   const alreadyStaged = await db
     .select({ cardId: explanationSuggestions.cardId })
@@ -119,6 +132,7 @@ async function main() {
     .where(
       and(
         eq(cards.userId, user.id),
+        eq(cards.certificationId, cert.id),
         eq(cards.type, 'multiple_choice'),
         eq(cards.status, 'active'),
         stagedIds.length > 0 ? notInArray(cards.id, stagedIds) : undefined
@@ -141,7 +155,7 @@ async function main() {
 
   for (const [i, batch] of batches.entries()) {
     console.log(`Batch ${i + 1}/${batches.length} (${batch.length} questions)...`);
-    const results = await generateBatch(batch);
+    const results = await generateBatch(batch, cert);
 
     for (const result of results) {
       const card = batch.find((c) => c.id === result.cardId);

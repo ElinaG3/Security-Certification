@@ -13,7 +13,14 @@
 // manual review (nothing bad ever reaches 'active').
 //
 // Usage:
-//   npx dotenv-cli -e .env -- tsx scripts/generate-gsc-cards.ts
+//   npx dotenv-cli -- tsx scripts/generate-gsc-cards.ts
+//
+// This script's PLAN below is hand-authored against SY0-701's actual
+// General Security Concepts objectives (1.1-1.4, 1.7) — a
+// --certification-id flag can't generalize hand-picked content hints to a
+// different cert's subject matter, so it refuses to run against anything
+// but SY0-701 (see requireSy0701 in cli-certification.ts) rather than
+// silently insert SY0-701-shaped content under a different cert's name.
 
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
@@ -24,6 +31,7 @@ import { getCurrentUser } from '../src/lib/auth';
 import { AI_MODELS } from '../src/lib/ai-models';
 import { shuffleChoiceContent } from '../src/lib/option-order';
 import { checkCardConsistency } from './check-card-consistency';
+import { parseCertificationIdArg, resolveCliCertification, requireSy0701 } from './cli-certification';
 
 const MODEL = AI_MODELS.content;
 const BATCH_SIZE = 5;
@@ -309,6 +317,8 @@ const MAX_ATTEMPTS = 3;
 async function main() {
   const db = getDb();
   const user = await getCurrentUser();
+  const cert = await resolveCliCertification(parseCertificationIdArg());
+  requireSy0701(cert, 'generate-gsc-cards.ts');
 
   const initialSlots = buildSlots();
   console.log(`Generating ${initialSlots.length} new ${DOMAIN} card(s)...`);
@@ -329,6 +339,7 @@ async function main() {
       if (card && issues.length === 0) {
         await db.insert(cards).values({
           userId: user.id,
+          certificationId: cert.id,
           domain: DOMAIN,
           topic: card.topic,
           type: card.type,
@@ -355,6 +366,7 @@ async function main() {
     if (result?.card) {
       await db.insert(cards).values({
         userId: user.id,
+        certificationId: cert.id,
         domain: DOMAIN,
         topic: result.card.topic,
         type: result.card.type,

@@ -60,7 +60,12 @@ export default async function HomePage() {
           <h1 style={{ marginBottom: 4 }}>{activeCert.name} Study</h1>
           <p style={{ color: '#666', margin: 0 }}>{activeCert.examCode}</p>
         </div>
-        <CertificationSwitcher certifications={allCerts} activeCertificationId={activeCert.id} />
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <CertificationSwitcher certifications={allCerts} activeCertificationId={activeCert.id} />
+          <Link href="/certifications/new" style={navLink}>
+            + Add certification
+          </Link>
+        </div>
       </div>
 
       <nav style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 32 }}>

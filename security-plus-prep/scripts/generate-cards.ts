@@ -1,3 +1,14 @@
+// Usage:
+//   npx dotenv-cli -- tsx scripts/generate-cards.ts [--sample] [--certification-id=<uuid>] [--count=<N>]
+//
+// Default (no --certification-id, no --count): the exact SY0-701 rebalance
+// plan this script was originally written for (unchanged — see
+// DEFAULT_SY0_701_PLAN below). Pass either flag to switch to the general
+// path: distribute --count (default 40) proportionally across the target
+// certification's own domain weights instead — genuinely reusable for any
+// cert, since it derives domains/weights/exam-name from the cert row
+// rather than a hand-sized plan.
+
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { getDb } from '../src/db';
@@ -5,16 +16,22 @@ import { cards } from '../src/db/schema';
 import { getCurrentUser } from '../src/lib/auth';
 import { AI_MODELS } from '../src/lib/ai-models';
 import { shuffleChoiceContent } from '../src/lib/option-order';
+import { parseCertificationIdArg, resolveCliCertification, type CliCertification } from './cli-certification';
+import { SY0_701_CERTIFICATION_ID } from '../src/lib/certifications';
 
 const MODEL = AI_MODELS.content;
 const BATCH_SIZE = 6;
+const DEFAULT_COUNT = 40;
 
 const client = new Anthropic();
 
-// Per-domain new-card counts sized so the pool hits official SY0-701
-// weights at 250 total cards (135 legacy + 115 new). General Security
-// Concepts gets 0 — it's already over target and stays untouched.
-const DOMAIN_PLAN: { domain: string; total: number }[] = [
+// The exact plan this script originally shipped with — per-domain new-card
+// counts sized so the pool hit official SY0-701 weights at 250 total cards
+// (135 legacy + 115 new). Preserved as-is and only used when no
+// --certification-id/--count override is given, so the existing bare
+// invocation keeps producing byte-identical slot counts. General Security
+// Concepts gets 0 — it was already over target.
+const DEFAULT_SY0_701_PLAN: { domain: string; total: number }[] = [
   { domain: 'Security Operations', total: 44 },
   { domain: 'Threats, Vulnerabilities, & Mitigations', total: 21 },
   { domain: 'Security Program Management and Oversight', total: 30 },
@@ -41,8 +58,14 @@ function splitCounts(total: number, shares: Record<string, number>): Record<stri
     counts[k] = Math.round(v);
     assigned += counts[k];
   }
-  // Fix rounding drift against the last key so counts sum to `total` exactly.
-  counts[keys[keys.length - 1]] += total - assigned;
+  // Fix rounding drift against the last key so counts sum to `total`
+  // exactly. Clamped at 0 — with a small `total` and several categories,
+  // an uncapped correction can swing negative, and a caller doing
+  // Array(negativeCount) (buildSlotsForDomain does) throws RangeError
+  // rather than just producing an empty/uneven split. Shares are already
+  // expected to be fractional (sum to ~1) — passing raw percentages here
+  // is exactly the kind of misuse that pushes this negative.
+  counts[keys[keys.length - 1]] = Math.max(0, counts[keys[keys.length - 1]] + total - assigned);
   return counts;
 }
 
@@ -72,15 +95,31 @@ function buildSlotsForDomain(domain: string, total: number): Slot[] {
   return slots;
 }
 
-function buildFullSlotPlan(): Slot[] {
-  return DOMAIN_PLAN.flatMap((d) => buildSlotsForDomain(d.domain, d.total));
+// General path: distribute `count` proportionally across the cert's own
+// domain weights, rounded the same way splitCounts already handles
+// rounding drift. Used whenever a --certification-id or --count override
+// is given — i.e. whenever DEFAULT_SY0_701_PLAN doesn't apply.
+function buildDomainPlan(cert: CliCertification, count: number): { domain: string; total: number }[] {
+  // splitCounts expects FRACTIONAL shares (summing to ~1, like MS_SHARE/
+  // DIFFICULTY_SHARE elsewhere in this file) — targetWeight is stored as a
+  // percentage (summing to ~100), so it must be normalized first. Passing
+  // raw percentages directly overcounts by ~100x, and the rounding-drift
+  // correction on the last key can swing negative and crash Array().
+  const weightSum = cert.domains.reduce((sum, d) => sum + d.targetWeight, 0) || 1;
+  const fractionalShares = Object.fromEntries(cert.domains.map((d) => [d.name, d.targetWeight / weightSum]));
+  const counts = splitCounts(count, fractionalShares);
+  return cert.domains.map((d) => ({ domain: d.name, total: counts[d.name] }));
 }
 
-function buildSampleSlots(): Slot[] {
-  // 4 domains x both types = 8, spanning difficulty tiers.
+function buildFullSlotPlan(domainPlan: { domain: string; total: number }[]): Slot[] {
+  return domainPlan.flatMap((d) => buildSlotsForDomain(d.domain, d.total));
+}
+
+function buildSampleSlots(domainPlan: { domain: string; total: number }[]): Slot[] {
+  // Both types x each domain with a slot, spanning difficulty tiers.
   const difficulties: Difficulty[] = ['recall', 'application', 'analysis', 'application'];
-  return DOMAIN_PLAN.flatMap((d, i) => [
-    { domain: d.domain, type: 'multiple_choice' as const, difficulty: difficulties[i] },
+  return domainPlan.flatMap((d, i) => [
+    { domain: d.domain, type: 'multiple_choice' as const, difficulty: difficulties[i % 4] },
     { domain: d.domain, type: 'multiple_select' as const, difficulty: difficulties[(i + 1) % 4], requiredCount: 2 },
   ]);
 }
@@ -102,9 +141,10 @@ const GeneratedCardSchema = z.object({
 const BatchResultSchema = z.object({ cards: z.array(GeneratedCardSchema) });
 type GeneratedCard = z.infer<typeof GeneratedCardSchema>;
 
-const submitCardsTool: Anthropic.Tool = {
+function submitCardsTool(cert: CliCertification): Anthropic.Tool {
+  return {
   name: 'submit_cards',
-  description: 'Submit a batch of generated CompTIA Security+ (SY0-701) practice questions.',
+  description: `Submit a batch of generated ${cert.name} (${cert.examCode}) practice questions.`,
   input_schema: {
     type: 'object',
     properties: {
@@ -116,7 +156,7 @@ const submitCardsTool: Anthropic.Tool = {
             domain: { type: 'string' },
             type: { type: 'string', enum: ['multiple_choice', 'multiple_select'] },
             topic: { type: 'string', description: 'Short topic label, 2-5 words' },
-            objective: { type: 'string', description: "SY0-701 exam objective number, e.g. '2.4'" },
+            objective: { type: 'string', description: `${cert.examCode} exam objective number, from the list given in the prompt` },
             authoredDifficulty: { type: 'string', enum: ['recall', 'application', 'analysis'] },
             question: { type: 'string' },
             options: { type: 'array', items: { type: 'string' } },
@@ -144,9 +184,10 @@ const submitCardsTool: Anthropic.Tool = {
     },
     required: ['cards'],
   },
-};
+  };
+}
 
-function buildPrompt(slots: Slot[]): string {
+function buildPrompt(slots: Slot[], cert: CliCertification): string {
   const spec = slots
     .map((s, i) => {
       const parts = [`${i + 1}. domain: "${s.domain}"`, `type: ${s.type}`, `authoredDifficulty: ${s.difficulty}`];
@@ -155,7 +196,17 @@ function buildPrompt(slots: Slot[]): string {
     })
     .join('\n');
 
-  return `Generate ${slots.length} original CompTIA Security+ (SY0-701) practice questions, one per spec below. Follow every spec exactly (domain, type, difficulty).
+  // The model genuinely knows CompTIA's official SY0-701 objectives from
+  // training — it does NOT know an arbitrary new certification's objective
+  // numbering, so that case needs the actual list supplied as context.
+  const objectiveGuidance =
+    cert.id === SY0_701_CERTIFICATION_ID
+      ? `assign the real ${cert.examCode} exam objective number (e.g. "1.2", "3.4", "4.7") that this question maps to within its domain — use your knowledge of the official ${cert.examCode} objectives list.`
+      : cert.objectives.length > 0
+        ? `assign the objective number from this list that this question maps to within its domain (do not invent a number not on this list):\n${cert.objectives.map((o) => `  ${o.number}${o.title ? ` — ${o.title}` : ''} (${o.domain})`).join('\n')}`
+        : `this certification has no objectives list yet — use "1.1" as a placeholder for every card; re-tag them once objectives are added.`;
+
+  return `Generate ${slots.length} original ${cert.name} (${cert.examCode}) practice questions, one per spec below. Follow every spec exactly (domain, type, difficulty).
 
 STYLE — every question, by default, is scenario-style:
 - 2-4 sentences of realistic situation (a company, an analyst, an incident, a design decision), then a question ending in BEST / MOST LIKELY / FIRST / MOST cost-effective (vary which one).
@@ -177,7 +228,7 @@ distractorExplanations ARRAY ALIGNMENT — this has been a source of bugs, follo
 
 multiple_select questions: the question text MUST end with "(Choose ${'{requiredCount}'}.)" matching the spec's requiredCount exactly (e.g. "(Choose two.)" or "(Choose three.)") — never omit this phrase. correct must be an array with exactly requiredCount indices.
 
-objective: assign the real SY0-701 exam objective number (e.g. "1.2", "3.4", "4.7") that this question maps to within its domain — use your knowledge of the official SY0-701 objectives list.
+objective: ${objectiveGuidance}
 
 topic: a short 2-5 word label for this specific question's subtopic.
 
@@ -197,13 +248,13 @@ ${spec}
 Call submit_cards with exactly ${slots.length} entries, in the same order as the specs above.`;
 }
 
-async function generateBatch(slots: Slot[]): Promise<GeneratedCard[]> {
+async function generateBatch(slots: Slot[], cert: CliCertification): Promise<GeneratedCard[]> {
   const response = await client.messages.create({
     model: MODEL,
     max_tokens: 8192,
-    tools: [submitCardsTool],
+    tools: [submitCardsTool(cert)],
     tool_choice: { type: 'tool', name: 'submit_cards' },
-    messages: [{ role: 'user', content: buildPrompt(slots) }],
+    messages: [{ role: 'user', content: buildPrompt(slots, cert) }],
   });
 
   const toolUse = response.content.find(
@@ -240,7 +291,15 @@ function printCard(card: GeneratedCard) {
 
 async function main() {
   const sampleArg = process.argv.includes('--sample');
-  const slots = sampleArg ? buildSampleSlots() : buildFullSlotPlan();
+  const certificationId = parseCertificationIdArg();
+  const cert = await resolveCliCertification(certificationId);
+  console.log(`Target certification: ${cert.name} (${cert.examCode})`);
+
+  const countArg = process.argv.find((a) => a.startsWith('--count='));
+  const usingDefaults = certificationId === SY0_701_CERTIFICATION_ID && !countArg;
+  const domainPlan = usingDefaults ? DEFAULT_SY0_701_PLAN : buildDomainPlan(cert, countArg ? Number(countArg.slice('--count='.length)) : DEFAULT_COUNT);
+
+  const slots = sampleArg ? buildSampleSlots(domainPlan) : buildFullSlotPlan(domainPlan);
 
   console.log(`Generating ${slots.length} card(s)${sampleArg ? ' (SAMPLE — not written to DB)' : ''}...`);
 
@@ -251,7 +310,7 @@ async function main() {
 
   for (const [i, batch] of batches.entries()) {
     console.log(`Batch ${i + 1}/${batches.length} (${batch.length} cards)...`);
-    const generated = await generateBatch(batch);
+    const generated = await generateBatch(batch, cert);
 
     for (const card of generated) {
       if (sampleArg) {
@@ -280,6 +339,7 @@ async function main() {
 
       await db.insert(cards).values({
         userId: user.id,
+        certificationId: cert.id,
         domain: card.domain,
         topic: card.topic,
         type: card.type,
