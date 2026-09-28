@@ -11,7 +11,7 @@
 // every chunk records the page range its text actually came from — what
 // makes the Library's "open this PDF at the relevant page" possible.
 
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { getDb } from '@/db';
 import { ingestedChunks, cards } from '@/db/schema';
 import { embedText, cosineSimilarity } from './embeddings';
@@ -160,7 +160,26 @@ export async function persistChunks({
     .select()
     .from(ingestedChunks)
     .where(and(eq(ingestedChunks.sourceFile, sourceFile), eq(ingestedChunks.certificationId, certificationId)));
-  if (existing.length > 0) return existing;
+  if (existing.length > 0) {
+    // Same file, already chunked — don't re-embed. But if it was
+    // originally ingested with no Library entry (the CLI's local-file
+    // path, pdfId: null) and is now being uploaded through the Library
+    // too, backfill the link so "Open in Library" works — without this,
+    // a file ingested once via the CLI silently never gets a working
+    // Library link no matter how many times it's later uploaded, since
+    // this dedup always returned the old pdfId-less rows unchanged.
+    if (pdfId) {
+      const needsBackfill = existing.some((c) => c.pdfId === null);
+      if (needsBackfill) {
+        await db
+          .update(ingestedChunks)
+          .set({ pdfId })
+          .where(and(eq(ingestedChunks.sourceFile, sourceFile), eq(ingestedChunks.certificationId, certificationId), isNull(ingestedChunks.pdfId)));
+        return existing.map((c) => (c.pdfId === null ? { ...c, pdfId } : c));
+      }
+    }
+    return existing;
+  }
 
   const rows: (typeof ingestedChunks.$inferSelect)[] = [];
   for (const raw of rawChunks) {
