@@ -13,3 +13,4 @@ samples-*.txt
 flagged-*.txt
 scripts/_backfill-*.json
 scripts/_tmp-*.ts
+screenshots/
