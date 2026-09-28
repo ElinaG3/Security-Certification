@@ -64,6 +64,20 @@
       "when": 1790579106337,
       "tag": "0008_add_recall_attempts",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790582310331,
+      "tag": "0009_add_certifications_and_objectives",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790582395414,
+      "tag": "0010_add_certification_id_to_content_tables",
+      "breakpoints": true
     }
   ]
 }

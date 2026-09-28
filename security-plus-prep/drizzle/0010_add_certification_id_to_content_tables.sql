@@ -1,0 +1,6 @@
+ALTER TABLE "cards" ADD COLUMN "certification_id" uuid DEFAULT '11111111-1111-1111-1111-111111111111' NOT NULL;--> statement-breakpoint
+ALTER TABLE "ingested_chunks" ADD COLUMN "certification_id" uuid DEFAULT '11111111-1111-1111-1111-111111111111' NOT NULL;--> statement-breakpoint
+ALTER TABLE "recall_attempts" ADD COLUMN "certification_id" uuid DEFAULT '11111111-1111-1111-1111-111111111111' NOT NULL;--> statement-breakpoint
+ALTER TABLE "cards" ADD CONSTRAINT "cards_certification_id_certifications_id_fk" FOREIGN KEY ("certification_id") REFERENCES "public"."certifications"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "ingested_chunks" ADD CONSTRAINT "ingested_chunks_certification_id_certifications_id_fk" FOREIGN KEY ("certification_id") REFERENCES "public"."certifications"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "recall_attempts" ADD CONSTRAINT "recall_attempts_certification_id_certifications_id_fk" FOREIGN KEY ("certification_id") REFERENCES "public"."certifications"("id") ON DELETE no action ON UPDATE no action;

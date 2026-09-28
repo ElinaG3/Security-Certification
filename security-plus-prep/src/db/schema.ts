@@ -10,10 +10,41 @@ import {
   vector,
 } from 'drizzle-orm/pg-core';
 import { EMBEDDING_DIMENSIONS } from '../lib/ai-models';
+import { SY0_701_CERTIFICATION_ID } from '../lib/certifications';
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   email: text('email').notNull().unique(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Multi-certification refactor, Stage 1 (schema + migrate SY0-701 data
+// only — see scripts/seed-sy0-701-certification.ts). One row per
+// certification the app can be pointed at; SY0-701 is seeded with a FIXED,
+// well-known id (src/lib/certifications.ts) rather than defaultRandom() so
+// existing insert call sites can reference it as a stable constant via a
+// column DEFAULT, without needing any application code to change yet —
+// Stage 2 replaces the constant/default with real "active certification"
+// selection.
+export const certifications = pgTable('certifications', {
+  id: uuid('id').primaryKey(),
+  name: text('name').notNull(),
+  examCode: text('exam_code').notNull().unique(),
+  domains: jsonb('domains').notNull(), // {name: string, targetWeight: number}[]
+  config: jsonb('config').notNull(), // {sessionSize, minMultiSelect, difficultyMix}
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// One row per exam objective (e.g. "1.2"). `title` is nullable — official
+// wording isn't available for every cert/objective yet (see
+// src/lib/topics.ts's fallback-label handling), so this is filled in as
+// real source material is ingested, not required upfront.
+export const objectives = pgTable('objectives', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  certificationId: uuid('certification_id').notNull().references(() => certifications.id),
+  number: text('number').notNull(),
+  title: text('title'),
+  domain: text('domain').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -22,6 +53,15 @@ export const users = pgTable('users', {
 export const cards = pgTable('cards', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').notNull().references(() => users.id),
+
+  // Multi-certification refactor, Stage 1 — see src/lib/certifications.ts.
+  // DEFAULT is the fixed SY0-701 id so this migration backfills every
+  // existing row automatically; Stage 2+ drops the default once inserts
+  // route through real active-certification selection instead.
+  certificationId: uuid('certification_id')
+    .notNull()
+    .references(() => certifications.id)
+    .default(SY0_701_CERTIFICATION_ID),
 
   domain: text('domain').notNull(),
   topic: text('topic').notNull(),
@@ -153,6 +193,12 @@ export const explanationSuggestions = pgTable('explanation_suggestions', {
 export const ingestedChunks = pgTable('ingested_chunks', {
   id: uuid('id').primaryKey().defaultRandom(),
 
+  // Multi-certification refactor, Stage 1 — see cards.certificationId above.
+  certificationId: uuid('certification_id')
+    .notNull()
+    .references(() => certifications.id)
+    .default(SY0_701_CERTIFICATION_ID),
+
   sourceFile: text('source_file').notNull(),
   examVersion: text('exam_version').notNull().default('SY0-701'),
 
@@ -183,6 +229,12 @@ export const ingestedChunks = pgTable('ingested_chunks', {
 export const recallAttempts = pgTable('recall_attempts', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').notNull().references(() => users.id),
+
+  // Multi-certification refactor, Stage 1 — see cards.certificationId above.
+  certificationId: uuid('certification_id')
+    .notNull()
+    .references(() => certifications.id)
+    .default(SY0_701_CERTIFICATION_ID),
 
   // Nullable: a recall session can be started generically (all topics) as
   // well as scoped to one SY0-701 objective.
