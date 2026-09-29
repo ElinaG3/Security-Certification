@@ -12,7 +12,10 @@ import {
 } from '../../../app/review/actions';
 import { CardEditorFields, type EditableCard } from './CardEditorFields';
 
-function toEditable(card: ReviewCard): EditableCard {
+type ChoiceReviewCard = Extract<ReviewCard, { type: 'multiple_choice' | 'multiple_select' }>;
+type FillInReviewCard = Extract<ReviewCard, { type: 'fill_in' }>;
+
+function toEditable(card: ChoiceReviewCard): EditableCard {
   const correct = Array.isArray(card.content.correct) ? card.content.correct : [card.content.correct];
   return {
     topic: card.topic,
@@ -41,16 +44,7 @@ function toUpdateInput(draft: EditableCard, type: 'multiple_choice' | 'multiple_
 // (search box, edit fields) never triggers these.
 const SHORTCUTS_HELP = 'j/k or ↓/↑ move · Enter/e expand · s save';
 
-function CardRow({
-  card,
-  mode,
-  expanded,
-  onToggleExpand,
-  onApprove,
-  onReject,
-  onToggleFlag,
-  onSave,
-}: {
+type CardRowProps = {
   card: ReviewCard;
   mode: 'pending' | 'active';
   expanded: boolean;
@@ -59,7 +53,69 @@ function CardRow({
   onReject?: () => void;
   onToggleFlag?: () => void;
   onSave: (input: UpdateCardInput) => Promise<{ ok: true } | { ok: false; issues: string[] }>;
-}) {
+};
+
+// Dispatches to a read-only row for fill_in (no options/correct shape to
+// edit — see updateCardContent, which only ever supports multiple_choice/
+// multiple_select) or the full editor row for everything else. Kept as two
+// components rather than one branching component so each can call its own
+// hooks unconditionally.
+function CardRow(props: CardRowProps) {
+  if (props.card.type === 'fill_in') return <FillInCardRow {...props} card={props.card} />;
+  return <ChoiceCardRow {...props} card={props.card} />;
+}
+
+function FillInCardRow({ card, mode, expanded, onToggleExpand, onApprove, onReject }: CardRowProps & { card: FillInReviewCard }) {
+  return (
+    <div
+      style={{
+        border: '1px solid #ccc',
+        borderRadius: 8,
+        marginBottom: 8,
+        background: card.flagged ? '#fdf4f4' : '#fff',
+      }}
+    >
+      <div
+        role="button"
+        tabIndex={-1}
+        onClick={onToggleExpand}
+        style={{ padding: '10px 12px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'baseline' }}
+      >
+        <span style={{ fontSize: 14 }}>
+          {card.flagged && '🚩 '}
+          <strong>{card.topic}</strong>
+          <span style={{ color: '#666' }}> — {card.domain}</span>
+          <span style={{ color: '#666' }}> (typed answer, {card.content.gradingMode})</span>
+        </span>
+        <span style={{ fontSize: 12, color: '#999' }}>{expanded ? '▲' : '▼'}</span>
+      </div>
+
+      {expanded && (
+        <div style={{ padding: '0 12px 12px', fontSize: 13 }}>
+          <p style={{ color: '#666', marginBottom: 8 }}>{card.content.question}</p>
+          <p style={{ marginBottom: 4 }}>
+            <strong>{card.content.gradingMode === 'exact' ? 'Accepted answers:' : 'Key points:'}</strong>{' '}
+            {card.content.acceptedAnswers.join(' · ')}
+          </p>
+          <p style={{ color: '#666', marginBottom: 10 }}>{card.content.explanation}</p>
+
+          {mode === 'pending' && (
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button type="button" onClick={onApprove} style={{ color: '#2e7d32' }}>
+                Approve (a)
+              </button>
+              <button type="button" onClick={onReject} style={{ color: '#c0392b' }}>
+                Reject (r)
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ChoiceCardRow({ card, mode, expanded, onToggleExpand, onApprove, onReject, onToggleFlag, onSave }: CardRowProps & { card: ChoiceReviewCard }) {
   const [draft, setDraft] = useState<EditableCard>(() => toEditable(card));
   const [saving, setSaving] = useState(false);
   const [issues, setIssues] = useState<string[] | null>(null);

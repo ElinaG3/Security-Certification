@@ -6,7 +6,7 @@ import { cards } from '@/db/schema';
 import { getCurrentUser } from '@/lib/auth';
 import { checkCardConsistency } from '@/lib/card-consistency';
 import { getActiveCertificationId } from '@/lib/active-certification';
-import type { MultipleChoiceContent, MultipleSelectContent } from '@/db/question-types';
+import type { MultipleChoiceContent, MultipleSelectContent, FillInContent } from '@/db/question-types';
 
 // Spot-check tool over ACTIVE cards (batch generation auto-approves on a
 // clean structural check — see check-card-consistency.ts / generate-gsc-
@@ -14,31 +14,56 @@ import type { MultipleChoiceContent, MultipleSelectContent } from '@/db/question
 // going live) plus the small pending queue that check does still kick out
 // (failed 3 auto-generation attempts). Both sections share the same
 // edit/save path; only pending gets approve/reject.
+//
+// A discriminated union (not one loose `content` field) so a `fill_in` card
+// can be routed to its own read-only review row (ReviewBoard.tsx) instead
+// of the multiple_choice/multiple_select editor, which assumes an
+// `options`/`correct` shape that fill_in content doesn't have.
+export type ReviewCard =
+  | {
+      id: string;
+      domain: string;
+      topic: string;
+      type: 'multiple_choice' | 'multiple_select';
+      status: string;
+      flagged: boolean;
+      flagNote: string | null;
+      objective: string | null;
+      sourceType: string | null;
+      content: MultipleChoiceContent | MultipleSelectContent;
+    }
+  | {
+      id: string;
+      domain: string;
+      topic: string;
+      type: 'fill_in';
+      status: string;
+      flagged: boolean;
+      flagNote: string | null;
+      objective: string | null;
+      sourceType: string | null;
+      content: FillInContent;
+    };
 
-export type ReviewCard = {
-  id: string;
-  domain: string;
-  topic: string;
-  type: 'multiple_choice' | 'multiple_select';
-  status: string;
-  flagged: boolean;
-  flagNote: string | null;
-  objective: string | null;
-  sourceType: string | null;
-  content: MultipleChoiceContent | MultipleSelectContent;
-};
+const REVIEWABLE_TYPES = ['multiple_choice', 'multiple_select', 'fill_in'] as const;
 
 function toReviewCard(row: typeof cards.$inferSelect): ReviewCard {
-  return {
+  const base = {
     id: row.id,
     domain: row.domain,
     topic: row.topic,
-    type: row.type as 'multiple_choice' | 'multiple_select',
     status: row.status,
     flagged: row.flagged,
     flagNote: row.flagNote,
     objective: row.objective,
     sourceType: row.sourceType,
+  };
+  if (row.type === 'fill_in') {
+    return { ...base, type: 'fill_in', content: row.content as FillInContent };
+  }
+  return {
+    ...base,
+    type: row.type as 'multiple_choice' | 'multiple_select',
     content: row.content as MultipleChoiceContent | MultipleSelectContent,
   };
 }
@@ -52,7 +77,7 @@ export async function listPendingCards(): Promise<ReviewCard[]> {
     .from(cards)
     .where(and(eq(cards.userId, user.id), eq(cards.certificationId, certificationId), eq(cards.status, 'pending')))
     .orderBy(desc(cards.createdAt));
-  return rows.filter((r) => r.type === 'multiple_choice' || r.type === 'multiple_select').map(toReviewCard);
+  return rows.filter((r) => (REVIEWABLE_TYPES as readonly string[]).includes(r.type)).map(toReviewCard);
 }
 
 const ACTIVE_PAGE_SIZE = 20;

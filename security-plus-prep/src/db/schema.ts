@@ -8,6 +8,7 @@ import {
   jsonb,
   boolean,
   vector,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import { EMBEDDING_DIMENSIONS } from '../lib/ai-models';
 import { SY0_701_CERTIFICATION_ID } from '../lib/certifications';
@@ -344,6 +345,43 @@ export const userCertificationSettings = pgTable('user_certification_settings', 
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// Guided Learning Session — Core (C1-C4). One row per (user, certification,
+// calendar day in Europe/Berlin — see src/lib/day-boundary.ts) — the
+// "one routine per day" rule is enforced by the unique index below, not
+// just application logic. Each stage's input + AI feedback is stored as its
+// own jsonb blob (same convention as recallAttempts.gapReport/cards.content)
+// so reopening the page mid-routine can resume at `step` with everything
+// already submitted still on screen — this app has no localStorage
+// "resume" pattern anywhere else, so the DB row IS the resume state.
+export const learningRoutineSessions = pgTable(
+  'learning_routine_sessions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id').notNull().references(() => users.id),
+    certificationId: uuid('certification_id').notNull().references(() => certifications.id),
+    dayKey: text('day_key').notNull(), // YYYY-MM-DD, Europe/Berlin
+
+    status: text('status').notNull().default('in_progress'), // 'in_progress' | 'completed'
+    step: text('step').notNull().default('start'), // 'start' | 'c1' | 'c2' | 'c3' | 'c4' | 'end'
+
+    // Resolved once, when C1 starts — the topic the whole routine is about.
+    topic: text('topic'),
+
+    // { abcAnswers: Record<string,string>, freeRecallText: string, recallAttemptId: string | null, gapReport: GapReport, score: number }
+    c1: jsonb('c1'),
+    // { cardIds: string[] (the queue, fixed at C2 start), results: {cardId, userAnswer, correct, reviewLogId}[] }
+    c2: jsonb('c2'),
+    // { userErrorText: string, actualErrors: {source: 'c1'|'c2', text: string}[], forgotten: string[] }
+    c3: jsonb('c3'),
+    // { createdCardIds: string[], skippedErrorCount: number } — see routine.ts's 5-card cap
+    c4: jsonb('c4'),
+
+    startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+  },
+  (t) => [uniqueIndex('learning_routine_sessions_user_cert_day').on(t.userId, t.certificationId, t.dayKey)]
+);
 
 // Free-text notes a user keeps per objective/topic (the topic page's "My
 // notes" textarea) — separate from cards/recall/chunks, this is the

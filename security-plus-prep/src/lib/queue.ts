@@ -16,16 +16,21 @@ type CardRow = typeof cards.$inferSelect;
 //
 // `limit` defaults to the active certification's own config.sessionSize
 // (not a hardcoded constant) when omitted — same for minMultiSelect below.
+// `types` (added for the Guided Learning Session's C2 — see routine.ts)
+// restricts the due pool to specific question types; omitted, it behaves
+// exactly as before.
 export async function getDueQueue({
   userId,
   domain,
   objective,
+  types,
   limit,
   now = new Date(),
 }: {
   userId: string;
   domain?: string;
   objective?: string;
+  types?: string[];
   limit?: number;
   now?: Date;
 }): Promise<CardRow[]> {
@@ -44,7 +49,8 @@ export async function getDueQueue({
         eq(cards.flagged, false),
         lte(cards.due, now),
         domain ? eq(cards.domain, domain) : undefined,
-        objective ? eq(cards.objective, objective) : undefined
+        objective ? eq(cards.objective, objective) : undefined,
+        types ? inArray(cards.type, types) : undefined
       )
     )
     .orderBy(asc(cards.due));
