@@ -383,6 +383,31 @@ export const learningRoutineSessions = pgTable(
   (t) => [uniqueIndex('learning_routine_sessions_user_cert_day').on(t.userId, t.certificationId, t.dayKey)]
 );
 
+// Personal English->German glossary, built up from the floating word
+// translator (any page). One row per (user, term) — a repeat lookup just
+// bumps lookupCount/lastLookedUpAt instead of re-asking the AI, so this
+// table is also a "don't re-translate what you already looked up" cache.
+// Not scoped into the unique index by certification (a term is the same
+// term regardless of which cert is active); certificationId is kept only
+// as metadata about which cert was active at first lookup.
+export const vocabTerms = pgTable(
+  'vocab_terms',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id').notNull().references(() => users.id),
+    certificationId: uuid('certification_id').references(() => certifications.id),
+
+    term: text('term').notNull(), // normalized: trimmed + lowercased
+    translationDe: text('translation_de').notNull(),
+    contextNote: text('context_note').notNull(), // one short sentence: what it means in IT security / exam context
+
+    lookupCount: integer('lookup_count').notNull().default(1),
+    firstLookedUpAt: timestamp('first_looked_up_at', { withTimezone: true }).notNull().defaultNow(),
+    lastLookedUpAt: timestamp('last_looked_up_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('vocab_terms_user_term').on(t.userId, t.term)]
+);
+
 // Free-text notes a user keeps per objective/topic (the topic page's "My
 // notes" textarea) — separate from cards/recall/chunks, this is the
 // learner's own writing, never AI-generated or graded. One row per

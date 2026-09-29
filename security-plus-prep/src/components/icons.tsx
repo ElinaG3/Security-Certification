@@ -132,6 +132,16 @@ export function CalendarIcon({ size = 20, className }: IconProps) {
   );
 }
 
+export function TranslateIcon({ size = 20, className }: IconProps) {
+  return (
+    <svg width={size} height={size} className={className} {...base}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18" />
+      <path d="M12 3c2.5 2.4 3.8 5.6 3.8 9s-1.3 6.6-3.8 9c-2.5-2.4-3.8-5.6-3.8-9s1.3-6.6 3.8-9Z" />
+    </svg>
+  );
+}
+
 export function ArrowRightIcon({ size = 18, className }: IconProps) {
   return (
     <svg width={size} height={size} className={className} {...base}>

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Fraunces, IBM_Plex_Sans } from 'next/font/google';
 import { Analytics } from '@vercel/analytics/react';
 import { NavShell } from '@/components/nav/NavShell';
+import { WordTranslatorWidget } from '@/components/words/WordTranslatorWidget';
 import { getActiveCertification, listCertifications } from '@/lib/active-certification';
 import './globals.css';
 
@@ -30,6 +31,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           activeExamCode={activeCert.examCode}
         />
         <main className="app-main">{children}</main>
+        <WordTranslatorWidget />
         <Analytics />
       </body>
     </html>

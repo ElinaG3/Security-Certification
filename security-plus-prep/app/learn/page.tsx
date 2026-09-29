@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { FeatureBigCard } from '@/components/home/FeatureBigCard';
 import { BookOpenIcon, BrainIcon, ClockIcon, BookIcon } from '@/components/icons';
 import { getTodayRoutineSummary } from '@/lib/routine';
@@ -23,6 +24,12 @@ export default async function LearnHubPage() {
         <FeatureBigCard href="/recall" icon={<BrainIcon size={22} />} title="Free recall" description="Write what you remember, get AI feedback." />
         <FeatureBigCard href="/library" icon={<BookOpenIcon size={22} />} title="Library" description="Read your source PDFs in-app, linked to topics." />
       </div>
+
+      <p style={{ marginTop: 20 }}>
+        <Link href="/words" style={{ color: 'var(--accent)', fontWeight: 600, fontSize: 14 }}>
+          Saved words →
+        </Link>
+      </p>
     </div>
   );
 }
