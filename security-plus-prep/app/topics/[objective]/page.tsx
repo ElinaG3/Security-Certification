@@ -3,7 +3,13 @@ import { notFound } from 'next/navigation';
 import { getCurrentUser } from '@/lib/auth';
 import { getTopic } from '@/lib/topics';
 import { getTopicNote } from '@/lib/topic-notes';
+import { getCachedStudySheet } from '@/lib/topic-study-sheet';
+import { listTopicImages } from '@/lib/topic-images';
+import { sourceTextFromReading, computeSourceHash } from '@/lib/study-sheet-generation';
 import { TopicNotes } from '@/components/topics/TopicNotes';
+import { StudySheetView } from '@/components/topics/StudySheetView';
+import { TopicImages } from '@/components/topics/TopicImages';
+import { getActiveCertificationId } from '@/lib/active-certification';
 import { BookOpenIcon, PlusIcon, BrainIcon, TargetIcon } from '@/components/icons';
 
 export const dynamic = 'force-dynamic';
@@ -12,8 +18,19 @@ export default async function TopicDetailPage({ params }: { params: Promise<{ ob
   const { objective } = await params;
   const user = await getCurrentUser();
   const decoded = decodeURIComponent(objective);
-  const [topic, note] = await Promise.all([getTopic(user.id, decoded), getTopicNote(decoded)]);
+  const [topic, note, cachedSheet, certificationId, topicImages] = await Promise.all([
+    getTopic(user.id, decoded),
+    getTopicNote(decoded),
+    getCachedStudySheet(decoded),
+    getActiveCertificationId(),
+    listTopicImages(decoded),
+  ]);
   if (!topic) notFound();
+
+  // A cheap hash comparison, not a re-fetch — decides whether the client
+  // needs to spend the one AI call, or can just render the cached sheet.
+  const currentSourceHash = topic.reading.length > 0 ? computeSourceHash(sourceTextFromReading(topic.reading)) : null;
+  const needsGeneration = topic.reading.length > 0 && (!cachedSheet || cachedSheet.sourceHash !== currentSourceHash);
 
   const pct = topic.totalActiveCount > 0 ? Math.round((topic.learnedCount / topic.totalActiveCount) * 100) : 0;
   const firstPdfRef = topic.pdfReferences[0];
@@ -38,22 +55,12 @@ export default async function TopicDetailPage({ params }: { params: Promise<{ ob
         <div className="card" style={{ padding: 24 }}>
           <h2 style={{ fontSize: 16, marginBottom: 14 }}>Read</h2>
 
-          {topic.reading.length === 0 ? (
-            <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 20 }}>
-              No source material ingested for this objective yet — upload a PDF in the Library.
-            </p>
-          ) : (
-            <div style={{ marginBottom: 20 }}>
-              {topic.reading.map((section, i) => (
-                <div key={i} style={{ marginBottom: 16 }}>
-                  {section.sectionTitle && (
-                    <p style={{ fontWeight: 600, fontSize: 14, marginBottom: 6 }}>{section.sectionTitle}</p>
-                  )}
-                  <p style={{ fontSize: 14, lineHeight: 1.65, color: 'var(--text)', whiteSpace: 'pre-wrap' }}>{section.content}</p>
-                </div>
-              ))}
-            </div>
-          )}
+          <StudySheetView
+            objective={decoded}
+            reading={topic.reading}
+            initialSheet={cachedSheet?.content ?? null}
+            needsGeneration={needsGeneration}
+          />
 
           {firstPdfRef && (
             <Link
@@ -67,6 +74,7 @@ export default async function TopicDetailPage({ params }: { params: Promise<{ ob
 
           <div style={{ paddingTop: 20, borderTop: '1px solid var(--card-border)' }}>
             <TopicNotes objective={decoded} initialContent={note} />
+            <TopicImages objective={decoded} certificationId={certificationId} initialImages={topicImages} />
           </div>
         </div>
 

@@ -420,3 +420,42 @@ export const topicNotes = pgTable('topic_notes', {
   content: text('content').notNull().default(''),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// Cached AI-rewritten "study sheet" view of a topic's source text (the Read
+// card's default view). `objective` is a plain text field matching the
+// convention already used by topicNotes/cards.objective/recallAttempts.objective
+// above (the exam objective NUMBER, e.g. "1.1") — this codebase has no
+// existing "objective_id" FK-to-objectives.id pattern to follow instead.
+// One row per (user, certification, objective); sourceHash lets the reader
+// tell, on next open, whether the underlying source text changed since this
+// was generated (source_hash mismatch -> regenerate), without re-hashing or
+// re-fetching source text just to check staleness.
+export const topicStudySheets = pgTable(
+  'topic_study_sheets',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id').notNull().references(() => users.id),
+    certificationId: uuid('certification_id').notNull().references(() => certifications.id),
+    objective: text('objective').notNull(),
+    content: jsonb('content').notNull(), // StudySheetContent — see src/lib/study-sheet-generation.ts
+    sourceHash: text('source_hash').notNull(),
+    model: text('model').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('topic_study_sheets_user_cert_objective').on(t.userId, t.certificationId, t.objective)]
+);
+
+// User-uploaded images attached to a topic's "My notes" area (screenshots,
+// diagrams) — separate from recallAttempts' drawing/handwriting images,
+// which are scoped to one recall attempt rather than persistent per-topic
+// notes. `objective` follows the same plain-text convention as topicNotes.
+export const topicImages = pgTable('topic_images', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  certificationId: uuid('certification_id').notNull().references(() => certifications.id),
+  objective: text('objective').notNull(),
+  url: text('url').notNull(),
+  caption: text('caption'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
