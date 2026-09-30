@@ -79,7 +79,7 @@ select {
 /* ---------- Layout shell ---------- */
 
 .app-main {
-  max-width: 1180px;
+  max-width: 1280px;
   margin: 0 auto;
   padding: 32px 24px calc(32px + var(--bottombar-height));
 }
@@ -331,6 +331,116 @@ select {
 
 .bottom-tab.active {
   color: var(--accent);
+}
+
+/* ---------- Topic detail page layout ---------- */
+
+.topic-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.topic-layout > * {
+  min-width: 0;
+}
+
+/* Compact aside first on phone (progress + one row of 3 actions);
+   desktop restores normal (Read-first) visual order via `order`. */
+.topic-aside {
+  order: -1;
+}
+
+.topic-action-row {
+  display: flex;
+  gap: 8px;
+}
+
+.topic-action-btn {
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+  padding: 8px 4px;
+  min-height: 56px;
+  text-align: center;
+}
+
+.topic-action-label-full {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .topic-layout {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  }
+  .topic-aside {
+    order: 0;
+    position: sticky;
+    top: calc(var(--topbar-height) + 16px);
+  }
+  .topic-action-row {
+    flex-direction: column;
+  }
+  .topic-action-btn {
+    flex-direction: row;
+    font-size: 14px;
+    padding: 0 18px;
+    min-height: 44px;
+  }
+  .topic-action-label-short {
+    display: none;
+  }
+  .topic-action-label-full {
+    display: inline;
+  }
+}
+
+/* ---------- Study sheet section grid ---------- */
+
+.study-sheet-sections {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+
+.study-sheet-sections > * {
+  min-width: 0;
+}
+
+.study-sheet-section-card {
+  border: 1px solid var(--card-border);
+  background: var(--neutral-tint);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+@media (min-width: 1100px) {
+  .study-sheet-sections {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .study-sheet-section-span {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ---------- Topic images grid ---------- */
+
+.topic-images-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+.topic-images-grid > * {
+  min-width: 0;
+}
+
+@media (min-width: 769px) {
+  .topic-images-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
 }
 
 /* ---------- Word translator (floating, global) ---------- */

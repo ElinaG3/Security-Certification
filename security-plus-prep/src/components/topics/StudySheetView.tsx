@@ -79,11 +79,11 @@ export function StudySheetView({
       </div>
 
       {view === 'original' && (
-        <div>
+        <div style={{ maxWidth: '70ch' }}>
           {reading.map((section, i) => (
             <div key={i} style={{ marginBottom: 16 }}>
               {section.sectionTitle && <p style={{ fontWeight: 600, fontSize: 14, marginBottom: 6 }}>{section.sectionTitle}</p>}
-              <p style={{ fontSize: 14, lineHeight: 1.65, color: 'var(--text)', whiteSpace: 'pre-wrap' }}>{section.content}</p>
+              <p style={{ fontSize: 14, lineHeight: 1.65, color: 'var(--text)', whiteSpace: 'pre-wrap', overflowWrap: 'break-word' }}>{section.content}</p>
             </div>
           ))}
         </div>
@@ -98,12 +98,12 @@ export function StudySheetView({
               <button type="button" className="btn" onClick={generate} style={{ marginBottom: 16 }}>
                 Retry
               </button>
-              <div style={{ paddingTop: 12, borderTop: '1px solid var(--card-border)' }}>
+              <div style={{ paddingTop: 12, borderTop: '1px solid var(--card-border)', maxWidth: '70ch' }}>
                 <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8 }}>Showing the original text instead:</p>
                 {reading.map((section, i) => (
                   <div key={i} style={{ marginBottom: 16 }}>
                     {section.sectionTitle && <p style={{ fontWeight: 600, fontSize: 14, marginBottom: 6 }}>{section.sectionTitle}</p>}
-                    <p style={{ fontSize: 14, lineHeight: 1.65, color: 'var(--text)', whiteSpace: 'pre-wrap' }}>{section.content}</p>
+                    <p style={{ fontSize: 14, lineHeight: 1.65, color: 'var(--text)', whiteSpace: 'pre-wrap', overflowWrap: 'break-word' }}>{section.content}</p>
                   </div>
                 ))}
               </div>

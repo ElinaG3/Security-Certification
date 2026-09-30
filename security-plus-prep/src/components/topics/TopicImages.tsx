@@ -116,7 +116,7 @@ export function TopicImages({
       {images.length === 0 ? (
         <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>No images yet.</p>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: 8 }}>
+        <div className="topic-images-grid">
           {images.map((img) => (
             <button
               key={img.id}
@@ -125,11 +125,12 @@ export function TopicImages({
                 setLightboxId(img.id);
                 setCaptionDraft(img.caption ?? '');
               }}
-              style={{ padding: 0, border: '1px solid var(--card-border)', borderRadius: 8, overflow: 'hidden', height: 80, cursor: 'pointer' }}
+              style={{ padding: 0, border: '1px solid var(--card-border)', borderRadius: 8, overflow: 'hidden', cursor: 'pointer', background: 'none', display: 'block', width: '100%', textAlign: 'left' }}
               aria-label={img.caption ?? 'View image'}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={img.url} alt={img.caption ?? ''} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+              <img src={img.url} alt={img.caption ?? ''} style={{ width: '100%', height: 'auto', maxHeight: '70vh', objectFit: 'contain', display: 'block' }} />
+              {img.caption && <p style={{ margin: 0, padding: '6px 10px', fontSize: 12, color: 'var(--text-secondary)' }}>{img.caption}</p>}
             </button>
           ))}
         </div>
@@ -152,9 +153,38 @@ export function TopicImages({
             padding: 20,
           }}
         >
-          <div onClick={(e) => e.stopPropagation()} style={{ maxWidth: '90vw', maxHeight: '80vh', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <button
+            type="button"
+            onClick={() => setLightboxId(null)}
+            aria-label="Close"
+            style={{
+              position: 'absolute',
+              top: 12,
+              right: 12,
+              width: 44,
+              height: 44,
+              borderRadius: '50%',
+              border: 'none',
+              background: 'rgba(255,255,255,0.15)',
+              color: '#fff',
+              fontSize: 24,
+              lineHeight: 1,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            ×
+          </button>
+
+          <div onClick={(e) => e.stopPropagation()} style={{ maxWidth: '95vw', maxHeight: '85vh', display: 'flex', flexDirection: 'column', gap: 12 }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={lightboxImage.url} alt={lightboxImage.caption ?? ''} style={{ maxWidth: '90vw', maxHeight: '65vh', objectFit: 'contain', borderRadius: 8 }} />
+            <img
+              src={lightboxImage.url}
+              alt={lightboxImage.caption ?? ''}
+              style={{ maxWidth: '95vw', maxHeight: '70vh', objectFit: 'contain', borderRadius: 8, touchAction: 'pinch-zoom' }}
+            />
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <input
                 type="text"
@@ -168,9 +198,6 @@ export function TopicImages({
               </button>
               <button type="button" className="btn" onClick={() => handleDelete(lightboxImage.id)} style={{ color: '#c0392b' }}>
                 Delete
-              </button>
-              <button type="button" className="btn" onClick={() => setLightboxId(null)}>
-                Close
               </button>
             </div>
           </div>
