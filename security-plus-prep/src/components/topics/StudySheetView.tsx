@@ -79,7 +79,7 @@ export function StudySheetView({
       </div>
 
       {view === 'original' && (
-        <div style={{ maxWidth: '70ch' }}>
+        <div style={{ maxWidth: '75ch' }}>
           {reading.map((section, i) => (
             <div key={i} style={{ marginBottom: 16 }}>
               {section.sectionTitle && <p style={{ fontWeight: 600, fontSize: 14, marginBottom: 6 }}>{section.sectionTitle}</p>}
@@ -98,7 +98,7 @@ export function StudySheetView({
               <button type="button" className="btn" onClick={generate} style={{ marginBottom: 16 }}>
                 Retry
               </button>
-              <div style={{ paddingTop: 12, borderTop: '1px solid var(--card-border)', maxWidth: '70ch' }}>
+              <div style={{ paddingTop: 12, borderTop: '1px solid var(--card-border)', maxWidth: '75ch' }}>
                 <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8 }}>Showing the original text instead:</p>
                 {reading.map((section, i) => (
                   <div key={i} style={{ marginBottom: 16 }}>

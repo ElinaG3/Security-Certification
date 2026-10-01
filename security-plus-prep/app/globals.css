@@ -1,6 +1,9 @@
+@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@600&display=swap');
+
 :root {
   --font-heading: var(--font-fraunces), Georgia, serif;
   --font-body: var(--font-plex-sans), system-ui, -apple-system, sans-serif;
+  --font-handwriting: 'Caveat', cursive;
 
   --bg: #f5f4ef;
   --card-bg: #ffffff;
@@ -397,34 +400,6 @@ select {
   }
 }
 
-/* ---------- Study sheet section grid ---------- */
-
-.study-sheet-sections {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 16px;
-}
-
-.study-sheet-sections > * {
-  min-width: 0;
-}
-
-.study-sheet-section-card {
-  border: 1px solid var(--card-border);
-  background: var(--neutral-tint);
-  border-radius: 12px;
-  padding: 14px 16px;
-}
-
-@media (min-width: 1100px) {
-  .study-sheet-sections {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  }
-  .study-sheet-section-span {
-    grid-column: 1 / -1;
-  }
-}
-
 /* ---------- Topic images grid ---------- */
 
 .topic-images-grid {
@@ -441,6 +416,85 @@ select {
   .topic-images-grid {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
+}
+
+/* ---------- My notes panel ---------- */
+
+.notes-section-mobile {
+  display: block;
+}
+
+.notes-section-desktop {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .notes-section-mobile {
+    display: none;
+  }
+  .notes-section-desktop {
+    display: block;
+  }
+}
+
+.notes-toggle {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 44px;
+  background: none;
+  border: none;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+  padding: 0;
+}
+
+.notes-scroll {
+  max-height: 50vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.sticky-note {
+  background: #fff6d6;
+  border: 1px solid #eadfa8;
+  border-left: 4px solid #e8c547;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+
+.sticky-note-body {
+  font-family: var(--font-handwriting), var(--font-body);
+  font-style: italic;
+  font-size: 15px;
+  line-height: 1.5;
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  color: #4a3f1f;
+}
+
+.sticky-note-time {
+  font-size: 11px;
+  color: #9c8f5e;
+}
+
+.sticky-note-action {
+  min-height: 44px;
+  padding: 0 10px;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.sticky-note-action:hover {
+  color: var(--accent);
 }
 
 /* ---------- Word translator (floating, global) ---------- */

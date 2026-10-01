@@ -7,19 +7,18 @@ const CALLOUT_STYLE: Record<CalloutKind, { border: string; bg: string; label: st
   remember: { border: '#2e7d32', bg: '#eaf5ec', label: 'Remember' },
 };
 
-// Comfortable line length for actual prose/lists, independent of how wide
-// the section card itself is (1 or 2 grid columns) — tables are exempt,
-// they need the card's full width.
-const PROSE_STYLE: React.CSSProperties = { maxWidth: '70ch', overflowWrap: 'break-word' };
+// Comfortable line length regardless of the surrounding column's own
+// width — tables are exempt, they use the full available width.
+const PROSE_STYLE: React.CSSProperties = { maxWidth: '75ch', overflowWrap: 'break-word', fontSize: 16, lineHeight: 1.6 };
 
 function Block({ block }: { block: StudySheetBlock }) {
   switch (block.type) {
     case 'paragraph':
-      return <p style={{ ...PROSE_STYLE, margin: '0 0 8px', lineHeight: 1.65 }}>{block.text}</p>;
+      return <p style={{ ...PROSE_STYLE, margin: '0 0 12px' }}>{block.text}</p>;
 
     case 'bullets':
       return (
-        <ul style={{ ...PROSE_STYLE, margin: '0 0 8px', paddingLeft: 20, lineHeight: 1.65 }}>
+        <ul style={{ ...PROSE_STYLE, margin: '0 0 12px', paddingLeft: 22 }}>
           {block.items.map((item, i) => (
             <li key={i}>{item}</li>
           ))}
@@ -28,7 +27,7 @@ function Block({ block }: { block: StudySheetBlock }) {
 
     case 'steps':
       return (
-        <ol style={{ ...PROSE_STYLE, margin: '0 0 8px', paddingLeft: 20, lineHeight: 1.65 }}>
+        <ol style={{ ...PROSE_STYLE, maxWidth: 'none', margin: '0 0 12px', paddingLeft: 22 }}>
           {block.items.map((item, i) => (
             <li key={i}>{item}</li>
           ))}
@@ -37,15 +36,15 @@ function Block({ block }: { block: StudySheetBlock }) {
 
     case 'term':
       return (
-        <p style={{ ...PROSE_STYLE, margin: '0 0 8px', lineHeight: 1.65 }}>
+        <p style={{ ...PROSE_STYLE, margin: '0 0 12px' }}>
           <strong style={{ color: 'var(--accent)' }}>{block.term}</strong> — {block.definition}
         </p>
       );
 
     case 'table': {
       return (
-        <div style={{ overflowX: 'auto', marginBottom: 8 }}>
-          <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: 14 }}>
+        <div style={{ overflowX: 'auto', marginBottom: 12 }}>
+          <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: 15 }}>
             <thead>
               <tr>
                 {block.headers.map((h, i) => (
@@ -80,11 +79,11 @@ function Block({ block }: { block: StudySheetBlock }) {
             borderLeft: `4px solid ${style.border}`,
             background: style.bg,
             borderRadius: 8,
-            padding: '8px 12px',
-            marginBottom: 8,
+            padding: '10px 14px',
+            marginBottom: 12,
           }}
         >
-          <p style={{ margin: '0 0 2px', fontSize: 12, fontWeight: 700, color: style.border, textTransform: 'uppercase', letterSpacing: 0.4 }}>{style.label}</p>
+          <p style={{ margin: '0 0 3px', fontSize: 12, fontWeight: 700, color: style.border, textTransform: 'uppercase', letterSpacing: 0.4 }}>{style.label}</p>
           <p style={{ margin: 0, lineHeight: 1.55 }}>{block.text}</p>
         </div>
       );
@@ -92,17 +91,10 @@ function Block({ block }: { block: StudySheetBlock }) {
   }
 }
 
-// Tables and long step lists get the full card width (both grid columns
-// at >=1100px) rather than being squeezed into one column.
-function spansBothColumns(section: StudySheetSection): boolean {
-  return section.blocks.some((b) => b.type === 'table' || (b.type === 'steps' && b.items.length > 4));
-}
-
-function Section({ section }: { section: StudySheetSection }) {
-  const spanBoth = spansBothColumns(section);
+function Section({ section, isFirst }: { section: StudySheetSection; isFirst: boolean }) {
   return (
-    <div className={`study-sheet-section-card${spanBoth ? ' study-sheet-section-span' : ''}`}>
-      <h3 style={{ fontSize: 16, color: 'var(--accent)', marginBottom: 8 }}>
+    <div style={{ marginBottom: 24, paddingTop: isFirst ? 0 : 20, borderTop: isFirst ? 'none' : '1px solid var(--card-border)' }}>
+      <h3 style={{ fontSize: 18, color: 'var(--accent)', marginBottom: 10 }}>
         {section.emoji} {section.heading}
       </h3>
       {section.blocks.map((block, i) => (
@@ -112,11 +104,13 @@ function Section({ section }: { section: StudySheetSection }) {
   );
 }
 
+// One flowing column — sections are separated by a thin divider + spacing,
+// not boxed cards, and never split into a 2-column layout.
 export function StudySheetRenderer({ sheet }: { sheet: StudySheetContent }) {
   return (
-    <div className="study-sheet-sections">
+    <div>
       {sheet.sections.map((section, i) => (
-        <Section key={i} section={section} />
+        <Section key={i} section={section} isFirst={i === 0} />
       ))}
     </div>
   );

@@ -459,3 +459,17 @@ export const topicImages = pgTable('topic_images', {
   caption: text('caption'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// Replaces the single-textarea topicNotes UI with separate, addable note
+// entries — topicNotes itself is untouched (still readable, still the
+// one-time backfill source; see listNotes in src/lib/topic-note-entries.ts).
+// `objective` follows the same plain-text convention as topicNotes/cards.
+export const topicNoteEntries = pgTable('topic_note_entries', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  certificationId: uuid('certification_id').notNull().references(() => certifications.id),
+  objective: text('objective').notNull(),
+  body: text('body').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
