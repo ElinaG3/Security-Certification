@@ -1,0 +1,542 @@
+@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@600&display=swap');
+
+:root {
+  --font-heading: var(--font-fraunces), Georgia, serif;
+  --font-body: var(--font-plex-sans), system-ui, -apple-system, sans-serif;
+  --font-handwriting: 'Caveat', cursive;
+
+  --bg: #f5f4ef;
+  --card-bg: #ffffff;
+  --card-border: #e3e0d8;
+  --card-radius: 16px;
+
+  --text: #1c1e1d;
+  --text-secondary: #5e625f;
+
+  --accent: #1f6f5f;
+  --accent-hover: #174f44;
+  --accent-tint: #e4efeb;
+  --neutral-tint: #f1eee6;
+
+  /* Progress tile scale, level 0 (not started) -> 4 (strong) */
+  --tile-0: #e6e3dc;
+  --tile-1: #d3e8e1;
+  --tile-2: #a3d2c4;
+  --tile-3: #5daa95;
+  --tile-4: #1f6f5f;
+  --tile-text-0: #5e625f;
+  --tile-text-1: #1c1e1d;
+  --tile-text-2: #1c1e1d;
+  --tile-text-3: #10231e;
+  --tile-text-4: #ffffff;
+
+  --topbar-height: 72px;
+  --bottombar-height: 64px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  margin: 0;
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: var(--font-body);
+}
+
+input,
+textarea,
+select {
+  font-family: var(--font-body);
+}
+
+/* ---------- Layout shell ---------- */
+
+.app-main {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 32px 24px calc(32px + var(--bottombar-height));
+}
+
+@media (min-width: 769px) {
+  .app-main {
+    padding: 32px 32px;
+  }
+}
+
+/* ---------- Cards ---------- */
+
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--card-radius);
+}
+
+/* ---------- Buttons ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 10px;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.btn:hover {
+  border-color: var(--accent);
+}
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+}
+
+.btn-primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* ---------- Pills ---------- */
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.pill-accent {
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+}
+
+.pill-neutral {
+  background: var(--neutral-tint);
+  color: var(--text-secondary);
+}
+
+.pill-tint {
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+
+/* ---------- Progress bars ---------- */
+
+.bar-track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--tile-0);
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--accent);
+}
+
+/* ---------- Objective tiles ---------- */
+
+.tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  transition: transform 0.1s ease;
+}
+
+.tile:hover {
+  transform: translateY(-1px);
+}
+
+.tile-0 {
+  background: var(--tile-0);
+  color: var(--tile-text-0);
+}
+.tile-1 {
+  background: var(--tile-1);
+  color: var(--tile-text-1);
+}
+.tile-2 {
+  background: var(--tile-2);
+  color: var(--tile-text-2);
+}
+.tile-3 {
+  background: var(--tile-3);
+  color: var(--tile-text-3);
+}
+.tile-4 {
+  background: var(--tile-4);
+  color: var(--tile-text-4);
+}
+
+/* ---------- Breadcrumb ---------- */
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.breadcrumb a:hover {
+  color: var(--accent);
+}
+
+/* ---------- Domain full-name tooltip ---------- */
+
+.domain-label {
+  position: relative;
+}
+
+.domain-label .domain-full-name {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 5;
+  background: var(--text);
+  color: #ffffff;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.domain-label:hover .domain-full-name {
+  display: block;
+}
+
+/* ---------- Dashed placeholder ---------- */
+
+.placeholder-dashed {
+  border: 1.5px dashed var(--card-border);
+  border-radius: var(--card-radius);
+  background: transparent;
+}
+
+/* ---------- Nav ---------- */
+
+.topbar {
+  display: none;
+}
+
+.mobile-header {
+  display: flex;
+}
+
+.bottombar {
+  display: flex;
+}
+
+@media (min-width: 769px) {
+  .topbar {
+    display: flex;
+  }
+  .mobile-header {
+    display: none;
+  }
+  .bottombar {
+    display: none;
+  }
+  .app-main {
+    padding-bottom: 32px;
+  }
+}
+
+.nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 14px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.nav-link:hover {
+  color: var(--accent);
+}
+
+.nav-link.active {
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+
+.bottom-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: var(--bottombar-height);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.bottom-tab.active {
+  color: var(--accent);
+}
+
+/* ---------- Topic detail page layout ---------- */
+
+.topic-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.topic-layout > * {
+  min-width: 0;
+}
+
+/* Compact aside first on phone (progress + one row of 3 actions);
+   desktop restores normal (Read-first) visual order via `order`. */
+.topic-aside {
+  order: -1;
+}
+
+.topic-action-row {
+  display: flex;
+  gap: 8px;
+}
+
+.topic-action-btn {
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+  padding: 8px 4px;
+  min-height: 56px;
+  text-align: center;
+}
+
+.topic-action-label-full {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .topic-layout {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  }
+  .topic-aside {
+    order: 0;
+    position: sticky;
+    top: calc(var(--topbar-height) + 16px);
+  }
+  .topic-action-row {
+    flex-direction: column;
+  }
+  .topic-action-btn {
+    flex-direction: row;
+    font-size: 14px;
+    padding: 0 18px;
+    min-height: 44px;
+  }
+  .topic-action-label-short {
+    display: none;
+  }
+  .topic-action-label-full {
+    display: inline;
+  }
+}
+
+/* ---------- Topic images grid ---------- */
+
+.topic-images-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+.topic-images-grid > * {
+  min-width: 0;
+}
+
+@media (min-width: 769px) {
+  .topic-images-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+/* ---------- My notes panel ---------- */
+
+.notes-section-mobile {
+  display: block;
+}
+
+.notes-section-desktop {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .notes-section-mobile {
+    display: none;
+  }
+  .notes-section-desktop {
+    display: block;
+  }
+}
+
+.notes-toggle {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 44px;
+  background: none;
+  border: none;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+  padding: 0;
+}
+
+.notes-scroll {
+  max-height: 50vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.sticky-note {
+  background: #fff6d6;
+  border: 1px solid #eadfa8;
+  border-left: 4px solid #e8c547;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+
+.sticky-note-body {
+  font-family: var(--font-handwriting), var(--font-body);
+  font-style: italic;
+  font-size: 15px;
+  line-height: 1.5;
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  color: #4a3f1f;
+}
+
+.sticky-note-time {
+  font-size: 11px;
+  color: #9c8f5e;
+}
+
+.sticky-note-action {
+  min-height: 44px;
+  padding: 0 10px;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.sticky-note-action:hover {
+  color: var(--accent);
+}
+
+/* ---------- Word translator (floating, global) ---------- */
+
+.word-fab {
+  position: fixed;
+  right: 16px;
+  bottom: calc(var(--bottombar-height) + 16px);
+  z-index: 40;
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  border: none;
+  background: var(--accent);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+}
+
+.word-fab:hover {
+  background: var(--accent-hover);
+}
+
+.word-panel {
+  position: fixed;
+  right: 16px;
+  bottom: calc(var(--bottombar-height) + 76px);
+  z-index: 40;
+  width: min(320px, calc(100vw - 32px));
+  max-height: min(420px, calc(100vh - var(--bottombar-height) - 96px));
+  overflow-y: auto;
+  padding: 16px;
+}
+
+@media (min-width: 769px) {
+  .word-fab {
+    bottom: 16px;
+  }
+  .word-panel {
+    bottom: 76px;
+  }
+}

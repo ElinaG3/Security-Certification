@@ -1,0 +1,139 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1785771139924,
+      "tag": "0000_mute_ricochet",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1785779478571,
+      "tag": "0001_perpetual_terror",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785791991686,
+      "tag": "0002_blushing_gravity",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785942265284,
+      "tag": "0003_add_mnemonic_and_elaboration_gate",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785964223832,
+      "tag": "0004_add_pbq_review_log_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790199289163,
+      "tag": "0005_add_exam_version",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790200874757,
+      "tag": "0006_add_ingested_chunks",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790530629412,
+      "tag": "0007_add_card_flag",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790579106337,
+      "tag": "0008_add_recall_attempts",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790582310331,
+      "tag": "0009_add_certifications_and_objectives",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790582395414,
+      "tag": "0010_add_certification_id_to_content_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790584088073,
+      "tag": "0011_add_active_certification_to_users",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1790589260114,
+      "tag": "0012_add_pdf_library",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790594111937,
+      "tag": "0013_clean_psylocke",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1790624368423,
+      "tag": "0014_organic_galactus",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1790667039631,
+      "tag": "0015_puzzling_mauler",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1790682509490,
+      "tag": "0016_purple_blade",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1790762178495,
+      "tag": "0017_adorable_tenebrous",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1790763771464,
+      "tag": "0018_complete_thor_girl",
+      "breakpoints": true
+    }
+  ]
+}

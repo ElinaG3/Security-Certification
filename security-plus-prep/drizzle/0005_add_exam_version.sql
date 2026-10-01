@@ -1,0 +1,1 @@
+ALTER TABLE "cards" ADD COLUMN "exam_version" text DEFAULT 'SY0-701' NOT NULL;
